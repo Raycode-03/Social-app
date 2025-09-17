@@ -1,0 +1,179 @@
+
+.editor-card {
+  overflow: hidden; 
+}
+
+.menu-bar {
+  padding: 15px;
+  background: #f7fafc;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.menu-bar button {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-bar button:hover {
+  background: #edf2f7;
+  transform: translateY(-1px);
+}
+
+.menu-bar button:active{
+  background: #4299e1;
+  color: white;
+  border-color: #4299e1;
+}
+
+.menu-bar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.editor-content {
+  padding: 25px;
+  overflow-y: auto;
+  word-break: break-word;
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+.ProseMirror {
+  outline: none;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.ProseMirror p {
+  margin: 0 0 1em;
+}
+
+.ProseMirror h1 {
+  font-size: 2.2em;
+  margin-top: 0;
+  margin-bottom: 0.5em;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.ProseMirror h2 {
+  font-size: 1.8em;
+  margin-top: 0;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  color: #2d3748;
+}
+.ProseMirror ul{
+  list-style-type: disc;
+  margin-left: 1.5em;
+}
+.ProseMirror ol{
+  list-style-type: decimal;
+  margin-left: 1.5em;
+}
+
+.ProseMirror ul, .ProseMirror ol {
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.ProseMirror blockquote {
+  border-left: 4px solid #616263;
+  padding-left: 1em;
+  margin-left: 0;
+  margin-right: 0;
+  font-style: italic;
+  color: #424b5a;
+}
+
+.ProseMirror code {
+  background: #f7fafc;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-size: 0.85em;
+  border: 1px solid #e2e8f0;
+}
+
+.ProseMirror .is-empty::before {
+  content: attr(data-placeholder);
+  color: #a0aec0;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Responsive fixes */
+@media (max-width: 640px) {
+  .editor-container {
+    padding: 8px;
+  }
+  
+  .menu-bar {
+    padding: 8px;
+    gap: 4px;
+  }
+  
+  .button-group {
+    gap: 4px;
+  }
+  
+  .menu-bar button {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+  
+  .editor-content {
+    padding: 12px;
+    min-height: 6rem;
+    max-height: 12rem;
+  }
+  
+  .ProseMirror {
+    font-size: 15px;
+  }
+  
+  .ProseMirror h1 {
+    font-size: 1.5em;
+  }
+  
+  .ProseMirror h2 {
+    font-size: 1.3em;
+  }
+  
+  .ProseMirror ul,
+  .ProseMirror ol {
+    margin-left: 1em;
+  }
+}
+/* Prevent horizontal scrolling */
+.ProseMirror > * {
+  max-width: 100%;
+}
+
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+}
+
+.editor-container, .editor-card {
+  max-width: 100%;
+  overflow-x: hidden;
+}
