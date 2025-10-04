@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: Flowline
+    env: node
+    plan: free        # or starter, standard, etc.
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm run start"
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: NEXT_PUBLIC_BASE_URL
+         value: https://flowline.onrender.com
