@@ -6,10 +6,10 @@ import Posts from "@/components/users/posts"
 import Newpost from '@/components/users/newpost'
 async function page() {
     const session = await auth();
-    // session?.user.email || null||
-    const email = "akereleolasun7@gmail.com";
-    console.log(email);
-  // if(session?.user){
+    const email= session?.user.email || null
+    //const email = "akereleolasun7@gmail.com";
+    
+   if(session?.user){
 
               return(
                 <div className='px-7 py-4'>
@@ -23,8 +23,8 @@ async function page() {
 
                 </div>
               )
-            }
-//   redirect('/auth/login')
-// }
+  }
+  redirect("/auth/login")
+}
 
 export default page

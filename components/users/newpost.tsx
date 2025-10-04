@@ -148,9 +148,9 @@ import Picker from "@emoji-mart/react"
         });
 
         const data = await res.json();
-        if (!res.ok) {
-          toast.error(data.error || "Unable to post");
-          return;
+        if (res.error) {
+            const message = typeof res.error === "string" ? res.error : res.error.error;
+            toast.error(message); // or setError(message)
         }
 
         toast.success(data.message || "Post created successfully!");  

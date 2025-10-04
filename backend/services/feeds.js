@@ -71,23 +71,26 @@ export async function newfeed(data) {
         },
     });
     // Upload media (wrap each upload in try/catch or handle errors)
-    let uploadedImages = [];
-    if (images.length > 0) {
-      for (const img of images) {
-        try {
-          const result = await uploadFileToCloudinary(img, "ray_social/images");
-          uploadedImages.push({
-            url: result.secure_url,
-            type: result.resource_type,
-            size: result.bytes,
-            name: result.original_filename,
-          });
-        } catch (err) {
-          console.error("Cloudinary image upload failed:", err);
-          return { error: "Failed to upload image. Try again." };
-        }
-      }
-    }
+   let uploadedImages = [];
+if (images.length > 0) {
+  try {
+    const results = await Promise.all(
+      images.map(img =>
+        uploadFileToCloudinary(img, "ray_social/images")
+      )
+    );
+    uploadedImages = results.map(res => ({
+      url: res.secure_url,
+      type: res.resource_type,
+      size: res.bytes,
+      name: res.original_filename,
+    }));
+  } catch (err) {
+    console.error("Cloudinary image upload failed:", err);
+    return { error: "Failed to upload image. Try again." };
+  }
+}
+
 
     let uploadedVideo = null;
     if (video) {

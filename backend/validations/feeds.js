@@ -17,7 +17,7 @@ export function newfeedsvaildate(data){
     const MAX_TEXT_LENGTH = 2500;
     const MAX_IMAGE_COUNT = 4;
     const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
-    const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+    const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     const ALLOWED_FILE_TYPES = [
       "application/pdf",
       "text/plain",
