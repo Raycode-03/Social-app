@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import data from "@emoji-mart/data"
 import Picker from "@emoji-mart/react"
 import type { Editor } from '@tiptap/react';
+import type { EmojiData } from '@emoji-mart/react';
   // text editing in textarea
   import PostEditor from "@/users/posteditor"
     export default function NewPost({ useremail }: { useremail: string  | null}) {
@@ -116,7 +117,7 @@ import type { Editor } from '@tiptap/react';
         e.target.value = "";
       }
       
-      const handleaddemoji = (emoji:string)=>{
+      const handleaddemoji = (emoji:EmojiData)=>{
         if (editorInstance) {
           editorInstance.chain().focus().insertContent(emoji.native).run();
         }
