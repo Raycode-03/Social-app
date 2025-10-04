@@ -216,7 +216,7 @@ import Picker from "@emoji-mart/react"
             src={postData.video.preview_url}
             about="Preview video"
             className="w-full rounded-lg max-h-32 object-contain"
-            controls
+            controls 
           />
         </div>
       )}
@@ -321,15 +321,14 @@ import Picker from "@emoji-mart/react"
               {/* Actions */}
               <div className="flex gap-2">
                 <Button variant="ghost" className="cursor-pointer hover:bg-gray-200" onClick={()=>{setShowPicker(false); setRawFiles({ images: [] , video: undefined, file: undefined}); setPostData({text: "" , images :[] , video : null, file: null});}}>Clear</Button>
-                <form action="" method="post" onSubmit={Handlepostsubmit}>
-                  {loading && (
-                    <>
-                    
-                    
-                    </>
-                  )}
-                  <Button className="cursor-pointer" disabled={loading}>{loading? (<> <Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending... </>)
-                  :("Post")}</Button>
+                <form method="post" onSubmit={Handlepostsubmit}>
+                  <>                  
+                    {loading && (
+                      <>  </>
+                    )}
+                    <Button className="cursor-pointer" disabled={loading}>{loading? (<> <Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending... </>)
+                    :("Post")}</Button>
+                  </>
                 </form>
               </div>
             </CardFooter>

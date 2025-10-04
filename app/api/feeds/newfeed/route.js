@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 export const config = {
   api: {
     bodyParser: false,
+     sizeLimit: '20mb', // Set desired value here
   },
 };
 
@@ -43,7 +44,7 @@ export async function POST(req) {
     if (data.file && (!data.file.name || data.file.size === 0)) {
       data.file = null;
     }
-      console.log(data , "the data sent to the validation" , data.images.length)    
+      console.log(data , "the data sent to the validation" , data.images.length , data.video)    
     // Validation
     const validationError = await newfeedsvaildate(data);
     if (validationError) {

@@ -1,4 +1,6 @@
+import sanitizeHtml from "sanitize-html"
 import { connect_db, get_db } from "@/lib/mongodb";
+
 import cloudinary from "@/lib/cloudinary";
 import { JSDOM } from "jsdom";
 export async function keywords(data){
@@ -31,7 +33,7 @@ export async function keywords(data){
 
 } 
 
-async function uploadFileToCloudinary(file, folder, resourceType = "auto") {
+async function uploadFileToCloudinary(file, folder, resourceType = "image" | "video" | "raw" ) {
   const buffer = Buffer.from(await file.arrayBuffer());
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
@@ -44,17 +46,9 @@ async function uploadFileToCloudinary(file, folder, resourceType = "auto") {
     uploadStream.end(buffer);
   });
 }
-const limitpostsubmit=async (email ,limit)=>{
-    const useremail= await get_db().collection("users").findOne({email}) || null;
-    const postlimitperday= useremail.limit;
-    if(postlimitperday<=3){
-      
-    }else{
-      return {error:"You have reached your daily post limit. Please try again tomorrow."};
-    }
-}
-export async function newfeed(data) {
 
+
+export async function newfeed(data) {
     const { text, images=[], video= null, file= null , email} = data
     await connect_db();
     if (!text && images.length === 0 && !video && !file ) {
@@ -63,47 +57,72 @@ export async function newfeed(data) {
     if(!text && (images.length >0 || video || file)){
         return { error: "Media posts must include text description. " };
     }
-     // Upload images to Cloudinary
-  let uploadedImages = [];
-  if (images.length > 0) {
-    for (const img of images) {
-      const result =await uploadFileToCloudinary(img, "ray_social/images");
-      uploadedImages.push({
-        url: result.secure_url,
-        type: result.resource_type,
-        size: result.bytes,
-        name: result.original_filename,
-      });
+    let safetext= sanitizeHtml(text, {
+       allowedTags: [
+        "b", "i", "u", "em", "strong", 
+        "p", "br", 
+        "ul", "ol", "li", 
+        "blockquote", 
+        "h1", "h2",
+        "a"
+      ],
+        allowedAttributes: {
+          a: ["href", "target"],
+        },
+    });
+    // Upload media (wrap each upload in try/catch or handle errors)
+    let uploadedImages = [];
+    if (images.length > 0) {
+      for (const img of images) {
+        try {
+          const result = await uploadFileToCloudinary(img, "ray_social/images");
+          uploadedImages.push({
+            url: result.secure_url,
+            type: result.resource_type,
+            size: result.bytes,
+            name: result.original_filename,
+          });
+        } catch (err) {
+          console.error("Cloudinary image upload failed:", err);
+          return { error: "Failed to upload image. Try again." };
+        }
+      }
     }
-  }
 
-  // Upload video
-  let uploadedVideo = null;
-  if (video) {
-    const result = await uploadFileToCloudinary(video, "ray_social/videos", "video");
-    uploadedVideo = {
-      url: result.secure_url,
-      type: result.resource_type,
-      size: result.bytes,
-      name: result.original_filename,
-    };
-  }
+    let uploadedVideo = null;
+    if (video) {
+      try {
+        const result = await uploadFileToCloudinary(video, "ray_social/videos", "video");
+        uploadedVideo = {
+          url: result.secure_url,
+          type: result.resource_type,
+          size: result.bytes,
+          name: result.original_filename,
+        };
+      } catch (err) {
+        console.error("Cloudinary video upload failed:", err);
+        return { error: "Failed to upload video. Try again." };
+      }
+    }
 
-  // Upload file (PDFs, docs, etc.)
-  let uploadedFile = null;
-  if (file) {
-    const result = await uploadFileToCloudinary(file, "ray_social/files", "raw");
-    uploadedFile = {  
-      url: result.secure_url,
-      type: result.resource_type,
-      size: result.bytes,
-      name: result.original_filename,
-    };
-  }
+    let uploadedFile = null;
+    if (file) {
+      try {
+        const result = await uploadFileToCloudinary(file, "ray_social/files", "raw");
+        uploadedFile = {
+          url: result.secure_url,
+          type: result.resource_type,
+          size: result.bytes,
+          name: result.original_filename,
+        };
+      } catch (err) {
+        console.error("Cloudinary file upload failed:", err);
+        return { error: "Failed to upload file. Try again." };
+      }
+    }
 
     const db = await get_db()
-    const result = await db.collection("posts").insertOne({email ,content:text ,images: uploadedImages, video: uploadedVideo,file: uploadedFile, createdAt : new Date()});
+    const result = await db.collection("posts").insertOne({email ,content:safetext ,images: uploadedImages, video: uploadedVideo,file: uploadedFile, createdAt : new Date(), likes:0});
 
     return { insertedId: result.insertedId };
-
-}
+      }

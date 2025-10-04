@@ -20,7 +20,7 @@ export async function signin_services(data){
             name:fullname,
             email,
             password:hashed_password,
-            created_at:new Date().toLocaleDateString('en-US',{
+            createdAt:new Date().toLocaleDateString('en-US',{
                 month:"long",
                 day:"2-digit",
                 year:"numeric",

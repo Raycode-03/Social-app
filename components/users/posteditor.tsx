@@ -12,33 +12,36 @@ const MenuBar = ({ editor }: { editor: Editor | null, selectionState?: number })
     return null;
   }
 
-  return (
-    <div className="menu-bar mt-1 p-3 bg-gray-100 rounded-lg shadow-sm">
-      <div className="button-group flex flex-wrap gap-2 font-medium">
-        <button
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          disabled={!editor.can().chain().focus().toggleBold().run()}
-          className={editor.isActive("bold") ? "is-active bg-blue-300 text-blue-900" : ""}
-        >
-          <strong>B</strong>
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          disabled={!editor.can().chain().focus().toggleItalic().run()}
-          className={editor.isActive("italic") ? "is-active bg-blue-300 text-blue-900" : ""}
-        >
-          <em>I</em>
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={editor.isActive("bulletList") ? "is-active bg-blue-300 text-blue-900" : ""}
-        >
-          • List
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={editor.isActive("orderedList") ? "is-active bg-blue-300 text-blue-900" : ""}
-        >
+    return (
+      <div className="menu-bar mt-1 p-3 bg-gray-100 rounded-lg shadow-sm">
+        <div className="button-group flex flex-wrap gap-2 font-medium">
+          <button
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            disabled={!editor.can().chain().focus().toggleBold().run()}
+            className={editor.isActive("bold") ? "is-active bg-blue-300 text-blue-900" : ""}
+
+          >
+            <strong>B</strong>
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            disabled={!editor.can().chain().focus().toggleItalic().run()}
+            className={editor.isActive("italic") ? "is-active bg-blue-300 text-blue-900" : ""}
+
+          >
+            <em>I</em>
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            className={editor.isActive("bulletList") ? "is-active bg-blue-300 text-blue-900" : ""}
+            
+          >
+            • List
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            className={editor.isActive("orderedList") ? "is-active bg-blue-300 text-blue-900" : ""}
+          >
           1. List
         </button>
         <button
