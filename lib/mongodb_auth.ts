@@ -25,13 +25,20 @@ async function connectWithRetry(retries = 5, delay = 2000): Promise<MongoClient>
   }
 }
 
-// HMR-safe global for dev
-if (process.env.NODE_ENV === "development") {
-  const g = global as typeof globalThis & { _mongoClient?: MongoClient };
-  if (!g._mongoClient) g._mongoClient = await connectWithRetry();
-  client = g._mongoClient;
-} else {
-  client = await connectWithRetry();
+async function initializeMongoClient() {
+  if (process.env.NODE_ENV === "development") {
+    const g = global as typeof globalThis & { _mongoClient?: MongoClient };
+    if (!g._mongoClient) {
+      g._mongoClient = await connectWithRetry();
+    }
+    client = g._mongoClient;
+  } else {
+    client = await connectWithRetry();
+  }
+  return client;
 }
 
-export default client;
+// Initialize and export a promise that resolves to the client
+const clientPromise = initializeMongoClient();
+
+export default clientPromise;

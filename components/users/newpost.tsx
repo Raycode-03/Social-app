@@ -10,12 +10,16 @@ import { toast } from "sonner"
 import data from "@emoji-mart/data"
 import Picker from "@emoji-mart/react"
 import type { Editor } from '@tiptap/react';
-import type { EmojiData } from '@emoji-mart/react';
+
   // text editing in textarea
   import PostEditor from "@/users/posteditor"
     export default function NewPost({ useremail }: { useremail: string  | null}) {
       const ismobile = useIsMobile();
-      
+      interface Emoji {
+        native: string;
+        
+      }
+
       interface uploadedfile{
         preview_url:string;
         name:string;
@@ -117,7 +121,7 @@ import type { EmojiData } from '@emoji-mart/react';
         e.target.value = "";
       }
       
-      const handleaddemoji = (emoji:EmojiData)=>{
+      const handleaddemoji = (emoji:Emoji)=>{
         if (editorInstance) {
           editorInstance.chain().focus().insertContent(emoji.native).run();
         }
