@@ -9,10 +9,12 @@ import { toast } from "sonner"
   import { useIsMobile } from "@/hooks/use-mobile"
 import data from "@emoji-mart/data"
 import Picker from "@emoji-mart/react"
+import type { Editor } from '@tiptap/react';
   // text editing in textarea
   import PostEditor from "@/users/posteditor"
     export default function NewPost({ useremail }: { useremail: string  | null}) {
       const ismobile = useIsMobile();
+      
       interface uploadedfile{
         preview_url:string;
         name:string;
@@ -148,9 +150,8 @@ import Picker from "@emoji-mart/react"
         });
 
         const data = await res.json();
-        if (res.error) {
-            const message = typeof res.error === "string" ? res.error : res.error.error;
-            toast.error(message); // or setError(message)
+        if (!res.ok) { 
+            toast.error(data.error); // or setError(message)
         }
 
         toast.success(data.message || "Post created successfully!");  
