@@ -51,7 +51,7 @@ export default function Page() {
     setMessage(null);
 
     try {
-      const baseurl = process.env.NEXT_PUBLIC_BASE_URL;
+      const baseurl = process.env.NEXTAUTH_URL||'http://localhost:3000';
       const res = await fetch(`${baseurl}/api/auth/user_auth/forgot-password/verify-email`, {
         method: "POST",
         headers: { "Content-type": "application/json" },
@@ -80,7 +80,7 @@ export default function Page() {
     setMessage(null);
 
     try {
-      const baseurl = process.env.NEXT_PUBLIC_BASE_URL;
+      const baseurl = process.env.NEXTAUTH_URL||'http://localhost:3000';
       const res = await fetch(`${baseurl}/api/auth/user_auth/forgot-password/verify-reset-code`, {
         method: "POST",
         headers: { "Content-type": "application/json" },
@@ -109,7 +109,7 @@ export default function Page() {
     setMessage(null);
 
     try {
-      const baseurl = process.env.NEXT_PUBLIC_BASE_URL;
+      const baseurl = process.env.NEXTAUTH_URL||'http://localhost:3000';
       const res = await fetch(`${baseurl}/api/auth/user_auth/forgot-password/new-password`, {
         method: "POST",
         headers: { "Content-type": "application/json" },

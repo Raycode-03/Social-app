@@ -60,7 +60,7 @@ export default function Page({ email }: { email: string  | null}) {
       useEffect(() => {
         const fetchfeeds= async()=>{
           try {
-            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+            const baseUrl = process.env.NEXTAUTH_URL||'http://localhost:3000';
         const res =await fetch(`${baseUrl}/api/feeds/allfeeds?email=${email}`,{
             method: "GET",
     })
@@ -116,7 +116,7 @@ export default function Page({ email }: { email: string  | null}) {
     }
     
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXTAUTH_URL||'http://localhost:3000';
     const res = await fetch(`${baseUrl}/api/feeds/likepost`,{
       method: "POST",
       headers: {'Content-Type': 'application/json'},

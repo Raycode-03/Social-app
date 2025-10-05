@@ -37,7 +37,7 @@ export default function Navbar() {
   const handler = setTimeout(async () => {
     try {
       setloading(true);
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+      const baseUrl = process.env.NEXTAUTH_URL||'http://localhost:3000';
       const res = await fetch(`${baseUrl}/api/feeds/keywords?query=${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error("Failed to fetch keywords");
       const data = await res.json();
@@ -66,7 +66,7 @@ export default function Navbar() {
   // const timeout = setTimeout(async() => {
   //   try{
   //     setloading(true)
-  //     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  //     const baseUrl = process.env.NEXTAUTH_URL||'http://localhost:3000';
   //     const res = await fetch(`${baseUrl}/api/feeds/searches`,{
   //       method: "POST",
   //       headers: { "Content-type": "application/json" },

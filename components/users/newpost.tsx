@@ -148,7 +148,7 @@ import type { Editor } from '@tiptap/react';
           if (rawFiles.file) {
             formData.append("file", rawFiles.file);
           }
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+        const baseUrl = process.env.NEXTAUTH_URL||'http://localhost:3000';
         const res = await fetch(`${baseUrl}/api/feeds/newfeed`, {
           method: "POST",
           body: formData,

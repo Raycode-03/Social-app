@@ -61,7 +61,7 @@ export function CardDemo({ data }: { data: "login" | "register" }) {
     setMessage(null);
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+      const baseUrl = process.env.NEXTAUTH_URL||'http://localhost:3000' ;
       const res = await fetch(`${baseUrl}/api/auth/user_auth/${cfg.endpoint}`, {
         method: "POST",
         headers: { "Content-type": "application/json" },
