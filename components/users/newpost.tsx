@@ -156,13 +156,15 @@ import type { Editor } from '@tiptap/react';
 
         const data = await res.json();
         if (!res.ok) { 
-            toast.error(data.error); // or setError(message)
+          toast.error(data.error); // or setError(message)
         }
-
-        toast.success(data.message || "Post created successfully!");  
-        setPostData({ text: "" , images: [] , video: null , file: null});
-        setshowpostmenu(false);
-        setShowPicker(false);
+        else{
+          toast.success(data.message || "Post created successfully!");  
+          setPostData({ text: "" , images: [] , video: null , file: null});
+          setshowpostmenu(false);
+          setShowPicker(false);
+        }
+        
       } catch (err) {
           toast.error(`Network error: ${String(err)}`);
         }

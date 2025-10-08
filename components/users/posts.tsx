@@ -14,6 +14,8 @@ import { toast } from "sonner"
 import { useRef } from "react"
 interface mediaItem {
   url : string;
+  name: string;
+  
 }
 interface FeedPost {
   _id: string;
@@ -280,12 +282,13 @@ export default function Page({ email }: { email: string  | null}) {
             {/* File */}
             {post.file && (
               <a
-                href={post.file.url}
+                href={`${post.file.url}?fl_attachment=${post.file.name || 'download'}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block mt-2 text-blue-600 underline"
+                download={post.file.name || "download"}
               >
-                📄 Download file
+                📄 Download {post.file.name || "file"}
               </a>
             )}
               
