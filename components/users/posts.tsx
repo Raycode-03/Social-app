@@ -6,7 +6,7 @@ import {
   CardHeader,
 } from "@/components/ui/card"
 import DOMPurify from "dompurify"
-import { Eye, Heart, MessageCircle, Share , Pause, Play} from "lucide-react"
+import { Eye, Heart, MessageCircle, Share , Pause, Play , File} from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -36,6 +36,7 @@ export default function Page({ email }: { email: string  | null}) {
   const [commentSection, setCommentSection] = useState(false)
   const [copied, setCopied] = useState(false);
   const [feeds, setFeeds] = useState<FeedPost[]>([]);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [feedLikes, setFeedLikes] = useState<Record<string, number>>({});
   const videoRef = useRef<HTMLVideoElement>(null);
    const [showOverlay, setShowOverlay] = useState(true);
@@ -85,6 +86,7 @@ export default function Page({ email }: { email: string  | null}) {
         }
          fetchfeeds();
   }, [email]);
+  
   // socket for real-time updates
 // useEffect(() => {
 //   socket.on("postLiked", (data) => {
@@ -203,96 +205,153 @@ export default function Page({ email }: { email: string  | null}) {
           )}
         </div>
 
-        <div className={`rounded-lg overflow-hidden ${post.video ? "" : "border border-gray-100"}  mb-2`}>
-              {/* Images */}
-            {post.images && post.images.length > 0 && (
-              <div className="mt-2">
-                {post.images.length === 1 && (
-                  <Image src={post.images[0].url} alt="Post media" className="rounded-lg w-full object-cover"  width={600} height={400}/>
-                )}
+        <div className={`rounded-lg overflow-hidden ${post.images.length>1 ? "border border-gray-100" : ""} mb-2 p-2 px-4`}>
+      {/* Images */}
+      {post.images && post.images.length > 0 && (
+        <div className="mt-2">
+          {post.images.length === 1 && (
+            <Image 
+              src={post.images[0].url} 
+              alt="Post media" 
+              className="rounded-lg w-full object-cover cursor-zoom-in" 
+              width={600} 
+              height={400}
+              onClick={() => setZoomedImage(post.images[0].url)}
+            />
+          )}
 
-                {post.images.length === 2 && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {post.images.map((img, i) => (
-                      <Image key={i} src={img.url} alt="Post media" className="rounded-lg object-cover" width={600} height={400}/>
-                    ))}
-                  </div>
-                )}
-
-                {post.images.length === 3 && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Image
-                      src={post.images[0].url}
-                      alt="Post media"
-                      className="rounded-lg col-span-1 row-span-2 object-cover" 
-                      width={600} height={400}
-                    />
-                    <div className="flex flex-col gap-2">
-                      <Image src={post.images[1].url} alt="Post media" className="rounded-lg object-cover" width={600} height={400}/>
-                      <Image src={post.images[2].url} alt="Post media" className="rounded-lg object-cover" width={600} height={400}/>
-                    </div>
-                  </div>
-                )}
-
-                {post.images.length >= 4 && (
-              <div className="grid grid-cols-2 gap-2">
-                {post.images.slice(0, 4).map((img, i) => (
-                  <div key={i} className="relative">
-                    <Image src={img.url} alt="Post media" className="rounded-lg object-cover w-full h-full" width={600} height={400}/>
-                    {i === 3 && post.images.length > 4 && (
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-lg font-semibold rounded-lg">
-                        +{post.images.length - 4}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-                
-              </div>
-            )}
-
-
-            {/* Video */}
-          {post.video && (
-  <div className="relative mt-2 rounded-lg overflow-hidden"  onMouseEnter={() => isPlaying && setShowOverlay(true)}
-        onMouseLeave={() => isPlaying && setShowOverlay(false)}>
-    <video
-      ref={videoRef}
-      className="w-full rounded-lg"
-      src={post.video.url}
-      onClick={handleToggle}
-    />
-
-    {/* Center overlay button */}
-    {showOverlay && (
-       <button
-            onClick={handleToggle}
-            className="absolute inset-0 flex items-center justify-center bg-black/20"
-          >
-            <div className="w-16 h-16 flex items-center justify-center rounded-full bg-gray-700/70 text-white text-2xl">
-              {isPlaying ? <Pause /> : <Play />}
+          {post.images.length === 2 && (
+            <div className="grid grid-cols-2 gap-3">
+              {post.images.map((img, i) => (
+                <Image 
+                  key={i} 
+                  src={img.url} 
+                  alt="Post media" 
+                  className="rounded-lg object-cover cursor-zoom-in" 
+                  width={600} 
+                  height={400}
+                  onClick={() => setZoomedImage(img.url)}
+                />
+              ))}
             </div>
-          </button>
-    )}
-  </div>
-)}
+          )}
 
+          {post.images.length === 3 && (
+            <div className="grid grid-cols-2 gap-3">
+              <Image
+                src={post.images[0].url}
+                alt="Post media"
+                className="rounded-lg col-span-1 row-span-2 object-cover cursor-zoom-in"
+                width={600} 
+                height={400}
+                onClick={() => setZoomedImage(post.images[0].url)}
+              />
+              <div className="flex flex-col gap-2">
+                <Image 
+                  src={post.images[1].url} 
+                  alt="Post media" 
+                  className="rounded-lg object-cover cursor-zoom-in" 
+                  width={600} 
+                  height={400}
+                  onClick={() => setZoomedImage(post.images[1].url)}
+                />
+                <Image 
+                  src={post.images[2].url} 
+                  alt="Post media" 
+                  className="rounded-lg object-cover cursor-zoom-in" 
+                  width={600} 
+                  height={400}
+                  onClick={() => setZoomedImage(post.images[2].url)}
+                />
+              </div>
+            </div>
+          )}
 
-            {/* File */}
-            {post.file && (
-              <a
-                href={`${post.file.url}?fl_attachment=${post.file.name || 'download'}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block mt-2 text-blue-600 underline"
-                download={post.file.name || "download"}
-              >
-                📄 Download {post.file.name || "file"}
-              </a>
-            )}
-              
+          {post.images.length >= 4 && (
+            <div className="grid grid-cols-2 gap-3">
+              {post.images.slice(0, 4).map((img, i) => (
+                <div key={i} className="relative">
+                  <Image 
+                    src={img.url} 
+                    alt="Post media" 
+                    className="rounded-lg object-cover w-full h-full cursor-zoom-in" 
+                    width={600} 
+                    height={400}
+                    onClick={() => setZoomedImage(img.url)}
+                  />
+                  {i === 3 && post.images.length > 4 && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-lg font-semibold rounded-lg">
+                      +{post.images.length - 4}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Video */}
+      {post.video && (
+        <div className="relative mt-2 rounded-lg overflow-hidden"  
+             onMouseEnter={() => isPlaying && setShowOverlay(true)}
+             onMouseLeave={() => isPlaying && setShowOverlay(false)}>
+          <video
+            ref={videoRef}
+            className="w-full rounded-lg"
+            src={post.video.url}
+            onClick={handleToggle}
+          />
+          {showOverlay && (
+            <button
+              onClick={handleToggle}
+              className="absolute inset-0 flex items-center justify-center bg-black/20"
+            >
+              <div className="w-16 h-16 flex items-center justify-center rounded-full bg-gray-700/70 text-white text-2xl">
+                {isPlaying ? <Pause /> : <Play />}
+              </div>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* File */}
+      {post.file && (
+        <a
+          href={`${post.file.url}?fl_attachment=${post.file.name || 'download'}`}
+          rel="noopener noreferrer"
+          className="block mt-2"
+          download={post.file.name || "download"}
+        >
+          <div className="flex flex-col items-center justify-center h-32 bg-gray-100 rounded-lg border border-gray-200"> {/* ← Added bg and border */}
+            <File className="text-3xl mb-2" strokeWidth={2} />
+            <span className="text-xs text-center truncate px-2">{post.file.name || "file"}</span>          
+          </div>          
+        </a>
+      )}
+
+      {/* Zoom Modal */}
+      {zoomedImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
+          onClick={() => setZoomedImage(null)}
+        >
+          <div className="relative max-w-4xl max-h-full">
+            <img 
+              src={zoomedImage} 
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button 
+              className="absolute top-4 right-4 text-white text-2xl bg-black/50 rounded-full w-10 h-10 flex items-center justify-center"
+              onClick={() => setZoomedImage(null)}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
 
         <div className="flex sm:flex-row justify-between items-start sm:items-center gap-2 text-gray-500 text-sm mb-1">
           <span className="flex gap-1 items-center">

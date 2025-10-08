@@ -34,6 +34,7 @@ export async function keywords(data){
 } 
 
 async function uploadFileToCloudinaryWithRetry(file, folder, resourceType = "image", maxRetries = 3) {
+
   let lastError;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -53,6 +54,8 @@ async function uploadFileToCloudinaryWithRetry(file, folder, resourceType = "ima
         folder: folder,
         resource_type: resourceType,
         timeout: resourceType === 'video' ? 180000 : 60000,
+        quality: "auto:best",  // ← Best quality for zoom
+        fetch_format: "auto",
       };
 
       const result = await cloudinary.uploader.upload(dataUri, uploadOptions);
