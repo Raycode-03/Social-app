@@ -323,6 +323,7 @@ export default function Page({ email }: { email: string  | null}) {
           className="block mt-2"
           download={post.file.name || "download"}
         >
+          
           <div className="flex flex-col items-center justify-center h-32 bg-gray-100 rounded-lg border border-gray-200"> {/* ← Added bg and border */}
             <File className="text-3xl mb-2" strokeWidth={2} />
             <span className="text-xs text-center truncate px-2">{post.file.name || "file"}</span>          

@@ -56,6 +56,9 @@ async function uploadFileToCloudinaryWithRetry(file, folder, resourceType = "ima
         timeout: resourceType === 'video' ? 180000 : 60000,
         quality: "auto:best",  // ← Best quality for zoom
         fetch_format: "auto",
+        use_filename: false,
+        unique_filename: true,
+        public_id: file.name.replace(/\.[^/.]+$/, ""),
       };
 
       const result = await cloudinary.uploader.upload(dataUri, uploadOptions);

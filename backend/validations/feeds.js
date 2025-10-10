@@ -7,12 +7,6 @@ export function keywordsvalidate(data) {
     }
 }
 
-
-function stripHtml(html) {
-  return html.replace(/<[^>]+>/g, ""); // remove all tags
-}
-import validator from "validator"
-
 function stripHtml(html) {
   return html.replace(/<[^>]+>/g, ""); // remove all tags
 }
