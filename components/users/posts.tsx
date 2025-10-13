@@ -136,10 +136,31 @@ export default function Page({ email }: { email: string  | null}) {
     } else {
       setLikedIds(prev => prev.filter(id => id !== postId));
       setFeedLikes(prev => ({ ...prev, [postId]: (prev[postId] || 1) - 1 }));
+    }   
+  }
+  }
+  const handleDownload = async (file: { url: string; name: string }| null) => {
+     if (!file) {
+        toast.error('File not available');
+        return;
     }
+  try {
+    const response = await fetch(file.url);
+    const blob = await response.blob();
     
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = file.name; // This will force the correct filename
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(downloadUrl);
+    
+  } catch (error) {
+    toast.error('Download failed');
   }
-  }
+};
   return (
     <div>
       {feeds.map(post => {
@@ -318,12 +339,13 @@ export default function Page({ email }: { email: string  | null}) {
       {/* File */}
       {post.file && (
         <a
-          href={`${post.file.url}?fl_attachment=${post.file.name || 'download'}`}
-          rel="noopener noreferrer"
-          className="block mt-2"
-          download={post.file.name || "download"}
-        >
+           onClick={(e) => {
+                e.preventDefault();
+                handleDownload(post?.file);
+          }}
           
+          className="block mt-2"
+        >
           <div className="flex flex-col items-center justify-center h-32 bg-gray-100 rounded-lg border border-gray-200"> {/* ← Added bg and border */}
             <File className="text-3xl mb-2" strokeWidth={2} />
             <span className="text-xs text-center truncate px-2">{post.file.name || "file"}</span>          

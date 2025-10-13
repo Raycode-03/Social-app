@@ -7,7 +7,7 @@ const SignInBtn = ({
   provider,
   variant = "default",
 }) => {
-  const [loading, setLoading] = useState(false);
+     const [loading, setLoading] = useState(false)
   return (
 
     <Button

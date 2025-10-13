@@ -2,7 +2,8 @@ import  {allfeeds}  from "@/backend/services/allfeeds";
 import { NextResponse } from "next/server";
 import { auth } from '@/app/api/auth/[...nextauth]/auth'
 export async function GET(req) {
-   const session = await auth();
+  try {
+     const session = await auth();
 
    if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -15,4 +16,10 @@ export async function GET(req) {
  // const email = searchParams.get("email");
   const feeds = await allfeeds(email);
   return NextResponse.json(feeds, { status: 200 });
+  } catch (error) {
+    const isDbError = error.message?.includes('MongoNetworkError') || error.message?.includes('ENOTFOUND');
+                    console.error("Error registering user:", error);
+                    return NextResponse.json({ error: isDbError ? "Network unavailable" : "Internal server error" }, {status: 500});
+  }
+  
 }

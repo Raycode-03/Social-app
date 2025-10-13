@@ -146,7 +146,7 @@ export function CardDemo({ data }: { data: "login" | "register" }) {
         {/* Buttons */}
         <CardFooter className="flex flex-col gap-3 mt-4">
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Loading..." : cfg.button}
+            {loading ? "Loading...": cfg.button}
           </Button>
 
           <Separator className="my-2 bg-gray-200" />

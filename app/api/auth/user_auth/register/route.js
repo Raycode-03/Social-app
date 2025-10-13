@@ -21,7 +21,8 @@
     // 3. Success
     return NextResponse.json({ user: serviceResult }, { status: 201 });
     } catch (error) {
-        console.error("Error registering user:", error);
-        return NextResponse.json({ error: process.env.NODE_ENV==="development" ? error.message : "Internal server error" }, {status: 500});
+        const isDbError = error.message?.includes('MongoNetworkError') || error.message?.includes('ENOTFOUND');
+                    console.error("Error registering user:", error);
+                    return NextResponse.json({ error: isDbError ? "Network unavailable" : "Internal server error" }, {status: 500});
     }
     }
