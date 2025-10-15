@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/card"
 import DOMPurify from "dompurify"
 import { Eye, Heart, MessageCircle, Share , Pause, Play , File} from "lucide-react"
+import PostsSkeleton from "./skeleton";
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -30,7 +31,8 @@ interface FeedPost {
   // add other fields as needed (images, comments, etc.)
 }
 export default function Page({ email }: { email: string  | null}) {
-  
+  // loading skeleton
+  const [loadSkeleton , setloadSkeleton] = useState(true)
   const [expanded, setExpanded] = useState(false);
   const [likedIds, setLikedIds] = useState<string[]>([]); 
   const [commentSection, setCommentSection] = useState(false)
@@ -38,29 +40,80 @@ export default function Page({ email }: { email: string  | null}) {
   const [feeds, setFeeds] = useState<FeedPost[]>([]);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [feedLikes, setFeedLikes] = useState<Record<string, number>>({});
-  const videoRef = useRef<HTMLVideoElement>(null);
-   const [showOverlay, setShowOverlay] = useState(true);
-   const [isPlaying, setIsPlaying] = useState(false);
+  // for video play/pause
 
-   
-  const handleToggle = () => {
-    const vid = videoRef.current;
+   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const [videoStates, setVideoStates] = useState<{[key: string]: { isPlaying: boolean; showOverlay: boolean }}>({});
+
+  // Helper function to set refs
+  const setVideoRef = (postId: string) => (el: HTMLVideoElement | null) => {
+    if (el) {
+      videoRefs.current.set(postId, el);
+    } else {
+      videoRefs.current.delete(postId);
+    }
+  };
+
+  const handleToggle = (postId: string) => {
+    const vid = videoRefs.current.get(postId);
     if (!vid) return;
 
     if (vid.paused) {
       vid.play();
-      setIsPlaying(true);
-      setShowOverlay(false);
-
+      setVideoStates(prev => ({
+        ...prev,
+        [postId]: { 
+          isPlaying: true, 
+          showOverlay: false 
+        }
+      }));
     } else {
       vid.pause();
-      setIsPlaying(false);
-      setShowOverlay(true);
+      setVideoStates(prev => ({
+        ...prev,
+        [postId]: { 
+          isPlaying: false, 
+          showOverlay: true 
+        }
+      }));
     }
   };
+
+  const handleMouseEnter = (postId: string) => {
+    if (videoStates[postId]?.isPlaying) {
+      setVideoStates(prev => ({
+        ...prev,
+        [postId]: { 
+          ...prev[postId], 
+          showOverlay: true 
+        }
+      }));
+    }
+  };
+  const handleMouseLeave = (postId: string) => {
+    if (videoStates[postId]?.isPlaying) {
+      setVideoStates(prev => ({
+        ...prev,
+        [postId]: { 
+          ...prev[postId], 
+          showOverlay: false 
+        }
+      }));
+    }
+  };
+const handleVideoEnd = (postId: string) => {
+  setVideoStates(prev => ({
+    ...prev,
+    [postId]: { 
+      isPlaying: false, 
+      showOverlay: true  // Show play button when video ends
+    }
+  }));
+};
   const router = useRouter();
       //fetch posts from the database
       useEffect(() => {
+        setloadSkeleton(true);
         const fetchfeeds= async()=>{
           try {
             const baseUrl = process.env.NEXTAUTH_URL||'http://localhost:3000';
@@ -82,7 +135,9 @@ export default function Page({ email }: { email: string  | null}) {
           } catch (err) {
             console.log(err);
             toast.error("Unable to fetch posts");
-          }
+          }finally {
+              setloadSkeleton(false);
+          } 
         }
          fetchfeeds();
   }, [email]);
@@ -161,6 +216,10 @@ export default function Page({ email }: { email: string  | null}) {
     toast.error('Download failed');
   }
 };
+  // 👇 Show skeleton while loading
+  if (loadSkeleton) {
+    return <PostsSkeleton count={5} />;
+  }
   return (
     <div>
       {feeds.map(post => {
@@ -182,6 +241,7 @@ export default function Page({ email }: { email: string  | null}) {
             ],
             ALLOWED_ATTR: ["href", "target"],
           });
+          
         return (
           <Card className="w-full max-w-[34rem] mx-auto rounded-lg shadow border border-gray-200 bg-white mb-6 pt-2 pb-2" key={post._id}>
       {/* Someone liked/commented bar */}
@@ -315,21 +375,23 @@ export default function Page({ email }: { email: string  | null}) {
       {/* Video */}
       {post.video && (
         <div className="relative mt-2 rounded-lg overflow-hidden"  
-             onMouseEnter={() => isPlaying && setShowOverlay(true)}
-             onMouseLeave={() => isPlaying && setShowOverlay(false)}>
+              onMouseEnter={() => handleMouseEnter(post._id)}
+            onMouseLeave={() => handleMouseLeave(post._id)}
+             >
           <video
-            ref={videoRef}
+             ref={setVideoRef(post._id)}
             className="w-full rounded-lg"
             src={post.video.url}
-            onClick={handleToggle}
+            onClick={() => handleToggle(post._id)}
+             onEnded={() => handleVideoEnd(post._id)}
           />
-          {showOverlay && (
+          {(videoStates[post._id]?.showOverlay ?? true) && (
             <button
-              onClick={handleToggle}
+              onClick={() => handleToggle(post._id)}
               className="absolute inset-0 flex items-center justify-center bg-black/20"
             >
               <div className="w-16 h-16 flex items-center justify-center rounded-full bg-gray-700/70 text-white text-2xl">
-                {isPlaying ? <Pause /> : <Play />}
+                 {videoStates[post._id]?.isPlaying ? <Pause /> : <Play />}
               </div>
             </button>
           )}
@@ -360,9 +422,10 @@ export default function Page({ email }: { email: string  | null}) {
           onClick={() => setZoomedImage(null)}
         >
           <div className="relative max-w-4xl max-h-full">
-            <img 
+            <img
               src={zoomedImage} 
               className="max-w-full max-h-full object-contain"
+            
               onClick={(e) => e.stopPropagation()}
             />
             <button 

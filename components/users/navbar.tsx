@@ -1,9 +1,11 @@
 "use client"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { Bell, CircleUserRound, MessagesSquare, Search, X } from "lucide-react"
+import { Bell, CircleUserRound, MessagesSquare, Search, X , LogOut , User} from "lucide-react"
 import Image from 'next/image'
 import { useEffect, useRef, useState } from "react"
+import { signOut } from "next-auth/react"
+
 export default function Navbar() {
   const ismobile = useIsMobile()
   const [query, setQuery] = useState("");
@@ -14,19 +16,35 @@ export default function Navbar() {
   const [showsearchmobile , setshowsearchmobile ] = useState(false)
   const { state, isMobile } = useSidebar() // 👈 get sidebar state
   const sidebarWidth = state === "expanded" ? "16rem" : "3rem" // matches your config
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef(null);
+
   // const [message, setMessage] = useState<string | null>(null);
   //  to close 
   const searchref = useRef(null)
-  useEffect(()=>{
-    const closeonclick = (e: MouseEvent)=>{
-        if(searchref.current && !(searchref.current as HTMLElement).contains(e.target as Node)){
-            setshowSearchResults(false);
-            setshowsearchmobile(false);
-        }
+  
+  // Separate useEffect for search
+  useEffect(() => {
+    const closeSearch = (e: MouseEvent) => {
+      if (searchref.current && !(searchref.current as HTMLElement).contains(e.target as Node)) {
+        setshowSearchResults(false);
+        setshowsearchmobile(false);
+      }
     }
-   document.addEventListener("mousedown",closeonclick) 
-   return ()=>document.removeEventListener("mousedown",closeonclick)
-  },[])
+    document.addEventListener("mousedown", closeSearch);
+    return () => document.removeEventListener("mousedown", closeSearch);
+  }, []);
+
+  // Separate useEffect for user menu
+  useEffect(() => {
+    const closeUserMenu = (e: MouseEvent) => {
+      if (userMenuRef.current && !(userMenuRef.current as HTMLElement).contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", closeUserMenu);
+    return () => document.removeEventListener("mousedown", closeUserMenu);
+  }, []);
   //  for the keywords of the search
   useEffect(() => {
   if (!query.trim()) {
@@ -149,7 +167,40 @@ export default function Navbar() {
     )}
   </div>
 );
+const handleSignOut = async () => {
+  try {
+    console.log("🧹 Starting nuclear cleanup...");
+    
+    // 1. Clear ALL cookies
+    const cookies = document.cookie.split(";");
+    for (let cookie of cookies) {
+      const eqPos = cookie.indexOf("=");
+      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+      
+      // Clear every possible variation
+      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
+      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=." + window.location.hostname;
+    }
 
+    // 2. Clear ALL storage
+    localStorage.clear();
+    sessionStorage.clear();
+
+    console.log("✅ Cleanup complete, now signing out...");
+
+    // 3. Now do the proper signOut
+    await signOut({ 
+      callbackUrl: "/auth/login",
+      redirect: true 
+    });
+
+  } catch (error) {
+    console.error("Sign out error:", error);
+    // Still redirect to login even if error
+    window.location.href = "/auth/login";
+  }
+};
   return (
     <>
       {/* Navbar */}
@@ -168,7 +219,7 @@ export default function Navbar() {
           <span className="flex items-center">
             <Image src={"logos/flowline.svg"} alt="flowline logo" width={23} height={23}   className=" min-w-[23px] min-h-23 mr-3"/>
 
-            {!ismobile && <p className="text-[1.0rem] font-semibold">Flowline</p>}
+            {!ismobile && <p className="text-[1.0rem] text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Flowline</p>}
           </span>
           )}
          {ismobile && (
@@ -219,9 +270,32 @@ export default function Navbar() {
           </button>
           
 
-          <button className="p-2 rounded-full  group">
-            <CircleUserRound className="text-gray-500 group-hover:text-gray-800"/>
-          </button>
+           {/* User Menu with Dropdown */}
+            <div className="relative" ref={userMenuRef}>
+              <button 
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="p-2 rounded-full group"
+              >
+                <CircleUserRound className="text-gray-500 group-hover:text-gray-800"/>
+              </button>
+
+              {/* Dropdown Menu */}
+              {showUserMenu && (
+                <div className="absolute right-0 top-12 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
+                  <button className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Profile
+                  </button>
+                  <button 
+                    onClick={handleSignOut}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2 text-red-600"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
         </div>
         )}
       </div>

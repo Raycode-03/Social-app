@@ -1,5 +1,5 @@
 import "./globals.css";
-
+import { Toaster } from "sonner";
 export const metadata = {
   title: 'Flowline', // This is the title that will appear in the browser tab
   description: 'A social media platform for sharing and connecting.',
@@ -13,6 +13,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         {children}
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   );
