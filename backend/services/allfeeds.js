@@ -1,10 +1,12 @@
 import { connect_db, get_db } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-export  async function allfeeds(email) {
+export async function allfeeds(email, page, limit) {
   await connect_db();
   const db = get_db();
 
+  const skip = (page - 1) * limit;
+  
   // user document
   const user = await db.collection('users').findOne({ email });
   if (!user) throw new Error('User not found');
@@ -23,61 +25,84 @@ export  async function allfeeds(email) {
     .toArray();
   const friendEmails = friendUsers.map(u => u.email);
 
-  // user’s own posts
+  // REMOVE skip/limit from individual queries - get ALL relevant posts
   const userPosts = await db.collection('posts')
     .find({ email })
     .sort({ createdAt: -1 })
     .toArray();
 
-  // posts by friends
   const friendsPosts = await db.collection('posts')
     .find({ email: { $in: friendEmails } })
     .sort({ createdAt: -1 })
     .toArray();
 
-  // // posts the user liked
   const userLikes = await db.collection('likes')
     .find({ email })
     .toArray();
   
   const likedPostIds = userLikes.map(l => l.postId);
   const likedPostIdsStr = likedPostIds.map(id => id.toString());
-  console.log(likedPostIdsStr, "likedPostIds")
+
   const postsUserLiked = await db.collection('posts')
-    .find({ _id: {$in:  likedPostIds } })
+    .find({ _id: {$in: likedPostIds } })
     .sort({ createdAt: -1 })
     .toArray();
   
-  // // posts friends liked
   const friendLikes = await db.collection('likes')
     .find({ email: { $in: friendEmails } })
     .toArray();
+  
   const postsFriendLiked = await db.collection('posts')
     .find({ _id: { $in: friendLikes.map(l => l.postId) } })
     .sort({ createdAt: -1 })
     .toArray();
-  const combined=[
-      ...userPosts,
-  ...friendsPosts,
-  ...postsUserLiked,
-  ...postsFriendLiked,  
-  ];
-  const unique = Array.from(new Map(combined.map(p => [p._id.toString(),
-      {...p, userLiked: likedPostIdsStr.includes(p._id.toString())}])
-      
-  ).values()
-);
-  unique.sort((a,b)=>b.createdAt-a.createdAt);
-  
-// return posts with their media files intact
-  return unique.map(post => ({
-    ...post,
-    images: post.images || [],
-    video: post.video || null,
-    file: post.file || null,
-  }));
-}
 
+  const combined = [
+    ...userPosts,
+    ...friendsPosts,
+    ...postsUserLiked,
+    ...postsFriendLiked,  
+  ];
+
+  // Remove duplicates by _id
+  const uniquePostsMap = new Map();
+  combined.forEach(post => {
+    const postId = post._id.toString();
+    if (!uniquePostsMap.has(postId)) {
+      uniquePostsMap.set(postId, {
+        ...post,
+        userLiked: likedPostIdsStr.includes(postId)
+      });
+    }
+  });
+
+  const unique = Array.from(uniquePostsMap.values());
+  unique.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  // Apply pagination AFTER combining and removing duplicates
+  const startIndex = skip;
+  const endIndex = startIndex + limit;
+  const resultPosts = unique.slice(startIndex, endIndex);
+  const hasMore = endIndex < unique.length;
+  
+  // After creating resultPosts, check for duplicates:
+  const postIds = resultPosts.map(p => p._id.toString());
+  const duplicateIds = postIds.filter((id, index) => postIds.indexOf(id) !== index);
+  if (duplicateIds.length > 0) {
+    console.log('DUPLICATE IDs FOUND:', duplicateIds);
+  }
+  return {
+    posts: resultPosts.map(post => ({
+      ...post,
+      images: post.images || [],
+      video: post.video || null,
+      file: post.file || null,
+    })),
+    hasMore,
+    currentPage: page,
+    totalPosts: unique.length // For debugging
+  };
+}
 export async function  likepost(postId , liked , email){
   await connect_db(); 
   const db = get_db();

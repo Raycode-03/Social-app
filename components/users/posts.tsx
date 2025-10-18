@@ -1,544 +1,596 @@
-"use client"
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card"
-import DOMPurify from "dompurify"
-import { Eye, Heart, MessageCircle, Share , Pause, Play , File} from "lucide-react"
-import PostsSkeleton from "./skeleton";
-import Image from "next/image"
-import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { toast } from "sonner"
-import { useRef } from "react"
-interface mediaItem {
-  url : string;
-  name: string;
-  
-}
-interface FeedPost {
-  _id: string;
-  email: string;
-  content: string;
-  createdAt: string;
-  likes: number;
-  file: mediaItem| null;
-  images: mediaItem [];
-  video: mediaItem | null;
-  userLiked: boolean;
-  // add other fields as needed (images, comments, etc.)
-}
-export default function Page({ email }: { email: string  | null}) {
-  // loading skeleton
-  const [loadSkeleton , setloadSkeleton] = useState(true)
-  const [expanded, setExpanded] = useState(false);
-  const [likedIds, setLikedIds] = useState<string[]>([]); 
-  const [commentSection, setCommentSection] = useState(false)
-  const [copied, setCopied] = useState(false);
-  const [feeds, setFeeds] = useState<FeedPost[]>([]);
-  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
-  const [feedLikes, setFeedLikes] = useState<Record<string, number>>({});
-  // for video play/pause
+  "use client"
+  import Image from "next/image"
+  import { useRouter } from "next/navigation"
+  import { useEffect, useState } from "react"
+  import { toast } from "sonner"
+  import { useRef } from "react"
+  import {Card,CardContent,CardFooter,CardHeader} from "@/components/ui/card"
+  import DOMPurify from "dompurify"
+  import { Eye, Heart, MessageCircle, Share , Pause, Play , File} from "lucide-react"
+  // import InfiniteScroll from 'react-infinite-scroll-component';
+  import { useInView } from 'react-intersection-observer'
+  import { useInfiniteQuery } from '@tanstack/react-query'
+  import PostsSkeleton from "./skeleton";
+  interface mediaItem {
+    url : string;
+    name: string;
+    
+  }
+  interface FeedPost {
+    _id: string;
+    email: string;
+    content: string;
+    createdAt: string;
+    likes: number;
+    file: mediaItem| null;
+    images: mediaItem [];
+    video: mediaItem | null;
+    userLiked: boolean;
+    // add other fields as needed (images, comments, etc.)
+  }
+  interface PostsResponse {
+    posts: FeedPost[];
+    hasMore: boolean;
+    currentPage: number;
+  }
 
-   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
-  const [videoStates, setVideoStates] = useState<{[key: string]: { isPlaying: boolean; showOverlay: boolean }}>({});
+  export default function Page({ email }: { email: string  | null}) {
+    // for the infinte scroll
+    // loading skeleton
+    const [loadSkeleton , setloadSkeleton] = useState(true)
+    const [expanded, setExpanded] = useState(false);
+    const [likedIds, setLikedIds] = useState<string[]>([]); 
+    const [commentSection, setCommentSection] = useState(false)
+    const [copied, setCopied] = useState(false);
+    const [feeds, setFeeds] = useState<FeedPost[]>([]);
+    const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+    const [feedLikes, setFeedLikes] = useState<Record<string, number>>({});
+    // for video play/pause
 
-  // Helper function to set refs
-  const setVideoRef = (postId: string) => (el: HTMLVideoElement | null) => {
-    if (el) {
-      videoRefs.current.set(postId, el);
-    } else {
-      videoRefs.current.delete(postId);
-    }
-  };
+    const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+    const [videoStates, setVideoStates] = useState<{[key: string]: { isPlaying: boolean; showOverlay: boolean }}>({});
 
-  const handleToggle = (postId: string) => {
-    const vid = videoRefs.current.get(postId);
-    if (!vid) return;
+    // Helper function to set refs
+    const setVideoRef = (postId: string) => (el: HTMLVideoElement | null) => {
+      if (el) {
+        videoRefs.current.set(postId, el);
+      } else {
+        videoRefs.current.delete(postId);
+      }
+    };
 
-    if (vid.paused) {
-      vid.play();
-      setVideoStates(prev => ({
-        ...prev,
-        [postId]: { 
-          isPlaying: true, 
-          showOverlay: false 
-        }
-      }));
-    } else {
-      vid.pause();
+    const handleToggle = (postId: string) => {
+      const vid = videoRefs.current.get(postId);
+      if (!vid) return;
+
+      if (vid.paused) {
+        vid.play();
+        setVideoStates(prev => ({
+          ...prev,
+          [postId]: { 
+            isPlaying: true, 
+            showOverlay: false 
+          }
+        }));
+      } else {
+        vid.pause();
+        setVideoStates(prev => ({
+          ...prev,
+          [postId]: { 
+            isPlaying: false, 
+            showOverlay: true 
+          }
+        }));
+      }
+    };
+
+    const handleMouseEnter = (postId: string) => {
+      if (videoStates[postId]?.isPlaying) {
+        setVideoStates(prev => ({
+          ...prev,
+          [postId]: { 
+            ...prev[postId], 
+            showOverlay: true 
+          }
+        }));
+      }
+    };
+    const handleMouseLeave = (postId: string) => {
+      if (videoStates[postId]?.isPlaying) {
+        setVideoStates(prev => ({
+          ...prev,
+          [postId]: { 
+            ...prev[postId], 
+            showOverlay: false 
+          }
+        }));
+      }
+    };
+    const handleVideoEnd = (postId: string) => {
       setVideoStates(prev => ({
         ...prev,
         [postId]: { 
           isPlaying: false, 
-          showOverlay: true 
+          showOverlay: true
         }
       }));
-    }
-  };
-
-  const handleMouseEnter = (postId: string) => {
-    if (videoStates[postId]?.isPlaying) {
-      setVideoStates(prev => ({
-        ...prev,
-        [postId]: { 
-          ...prev[postId], 
-          showOverlay: true 
-        }
-      }));
-    }
-  };
-  const handleMouseLeave = (postId: string) => {
-    if (videoStates[postId]?.isPlaying) {
-      setVideoStates(prev => ({
-        ...prev,
-        [postId]: { 
-          ...prev[postId], 
-          showOverlay: false 
-        }
-      }));
-    }
-  };
-const handleVideoEnd = (postId: string) => {
-  setVideoStates(prev => ({
-    ...prev,
-    [postId]: { 
-      isPlaying: false, 
-      showOverlay: true  // Show play button when video ends
-    }
-  }));
-};
-  const router = useRouter();
-      //fetch posts from the database
-      useEffect(() => {
-        setloadSkeleton(true);
-        const fetchfeeds= async()=>{
-          try {
-            const baseUrl = process.env.NEXTAUTH_URL||'http://localhost:3000';
-        const res =await fetch(`${baseUrl}/api/feeds/allfeeds?email=${email}`,{
-            method: "GET",
-    })
-      const data = await res.json();
+    };
+    const router = useRouter();
+        //fetch posts from the database
+        // REPLACE your manual fetch with React Query
+    const {
+      data,
+      fetchNextPage,
+      hasNextPage,
+      isFetchingNextPage,
+      isLoading,
+    } = useInfiniteQuery({
+      queryKey: ['posts', email],
+      queryFn: async ({ pageParam = 1 }) => {
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+        const res = await fetch(`${baseUrl}/api/feeds/allfeeds?email=${email}&page=${pageParam}&limit=5`);
+        
         if (res.status === 401) {
           router.push("/auth/login");
-        }
-        if (!res.ok) {
-          toast.error(data.error || "Unable to post");
           return;
         }
-        setFeeds(data)
-         // ✅ Pre-populate likedIds from server response
-        const liked = data.filter((post: FeedPost) => post.userLiked).map((post: FeedPost) => post._id);
-        setLikedIds(liked);
-          } catch (err) {
-            console.log(err);
-            toast.error("Unable to fetch posts");
-          }finally {
-              setloadSkeleton(false);
-          } 
-        }
-         fetchfeeds();
-  }, [email]);
-  
-  // socket for real-time updates
-// useEffect(() => {
-//   socket.on("postLiked", (data) => {
-//     // Update the local state or refetch data as needed
-//     console.log("Post liked:", data);
-//   });
-//   return () => {
-//     socket.disconnect();
-//   };
-// }, []);
-
- const handleShare = async (postId : string) => {
-    const shareUrl = `${window.location.origin}/feeds/post/${postId}`;
-    await navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-  const togglelike = async (postId : string , )=> {
-    
-    const alreadyliked = likedIds.includes(postId) ;
-    if (alreadyliked) {
-      setLikedIds(prev => prev.filter(id => id !== postId));   // remove
-        setFeedLikes(prev => ({
-    ...prev,
-    [postId]: (prev[postId] ?? feeds.find(p=>p._id===postId)?.likes ?? 0)
-             + (alreadyliked ? -1 : 1)
-  }));
-    } else {
-      setLikedIds(prev => [...prev, postId]);  // add
-      setFeedLikes(prev => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
-    }
-    
-  try {
-    const baseUrl = process.env.NEXTAUTH_URL||'http://localhost:3000';
-    const res = await fetch(`${baseUrl}/api/feeds/likepost`,{
-      method: "POST",
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({postId , liked: !alreadyliked, email}),     
-    })
-    const data_likes= await res.json();
-  } catch (error) { 
-    console.log(error)
-    toast.error('failed to update like');
-     if (alreadyliked) {
-      setLikedIds(prev => [...prev, postId]);
-      setFeedLikes(prev => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
-    } else {
-      setLikedIds(prev => prev.filter(id => id !== postId));
-      setFeedLikes(prev => ({ ...prev, [postId]: (prev[postId] || 1) - 1 }));
-    }   
-  }
-  }
-  const handleDownload = async (file: { url: string; name: string }| null) => {
-     if (!file) {
-        toast.error('File not available');
+        
+        if (!res.ok) {
+          const data = await res.json();
+          toast.error(data.error || "Unable to fetch posts");
         return;
+        }
+        
+        return res.json();
+      },
+      initialPageParam: 1,
+      getNextPageParam: (lastPage: PostsResponse) => {
+        return lastPage.hasMore ? lastPage.currentPage + 1 : undefined;
+      },
+      enabled: !!email,
+    });
+
+    // Simple intersection observer
+    const { ref, inView } = useInView();
+
+    useEffect(() => {
+      if (inView && hasNextPage) {
+        fetchNextPage();
+      }
+    }, [inView, hasNextPage, fetchNextPage]);
+
+    
+    
+    // Initialize likedIds when data loads
+  useEffect(() => {
+    if (data) {
+      const allPosts = data.pages.flatMap(page => page.posts);
+      setFeeds(allPosts);
+        // Get liked posts from the actual data (userLiked field from backend)
+    const liked = allPosts
+      .filter(post => post.userLiked === true) // Use the backend value
+      .map(post => post._id);
+    
+    console.log('Liked IDs from backend:', liked); // Debug log
+    setLikedIds(liked);
     }
-  try {
-    const response = await fetch(file.url);
-    const blob = await response.blob();
-    
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = file.name; // This will force the correct filename
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(downloadUrl);
-    
-  } catch (error) {
-    toast.error('Download failed');
-  }
-};
-  // 👇 Show skeleton while loading
-  if (loadSkeleton) {
-    return <PostsSkeleton count={5} />;
-  }
-  return (
-    <div>
-      {feeds.map(post => {
-        const isliked = likedIds.includes(post._id);  
-        const fullText = post.content || "";
-        const previewText =
-          fullText.length > 120 && !expanded
-            ? fullText.slice(0, 120) + "..."
-            : fullText;
-          // ✅ sanitize here
-          const clean = DOMPurify.sanitize(previewText, {
-            ALLOWED_TAGS: [
-              "b", "i", "u", "em", "strong",
-              "p", "br",
-              "ul", "ol", "li",
-              "blockquote",
-              "h1", "h2",
-              "a"
-            ],
-            ALLOWED_ATTR: ["href", "target"],
-          });
-          
-        return (
-          <Card className="w-full max-w-[34rem] mx-auto rounded-lg shadow border border-gray-200 bg-white mb-6 pt-2 pb-2" key={post._id}>
-      {/* Someone liked/commented bar */}
-      <div className="w-full flex items-center gap-2 text-gray-500 text-sm py-2 px-3 sm:px-5 border-b border-gray-200">
-        <Image
-          src="/logos/bake.jpg"   
-          alt="User avatar"
-          width={28}
-          height={28}
-          className="rounded-full border w-8 h-8"
-        />
-        <span className="truncate">Emmanuel Lucius commented on this</span>
-      </div>
+  }, [data]);
+    if (isLoading) {
+      return <PostsSkeleton count={5} />;
+    }
 
-      <CardHeader className="flex flex-row items-center gap-2 px-3 py-1 sm:px-5 sm:py-2">
-        <Image
-          src="/logos/bake.jpg"
-          alt="User avatar"
-          width={48}
-          height={48}
-          className="rounded-full border w-15 h-15 object-fill"
-        />
-        <div className="flex flex-col">
-          <span className="font-semibold text-gray-900 text-base">{post.email}</span>
-          <span className="text-xs text-gray-500">{new Date(post.createdAt).toLocaleString()}</span>
-        </div>
-      </CardHeader>
+    // socket for real-time updates
+  // useEffect(() => {
+  //   socket.on("postLiked", (data) => {
+  //     // Update the local state or refetch data as needed
+  //     console.log("Post liked:", data);
+  //   });
+  //   return () => {
+  //     socket.disconnect();
+  //   };
+  // }, []);
 
-      <CardContent className="px-3 py-2 sm:px-5 sm:py-3">
-        <div className="text-gray-900 text-[15px] leading-relaxed mb-2 break-words" 
-          dangerouslySetInnerHTML={{ __html: clean }}
-        />
-          <div>
-            
-          {fullText.length > 120 && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="ml-1 text-blue-600 hover:underline focus:outline-none"
-            >
-              {expanded ? "Read less" : "Read more"}
-            </button>
-          )}
-        </div>
-
-        <div className={`rounded-lg overflow-hidden ${post.images.length>1 ? "border border-gray-100" : ""} mb-2 p-2 px-4`}>
-      {/* Images */}
-      {post.images && post.images.length > 0 && (
-        <div className="mt-2">
-          {post.images.length === 1 && (
-            <Image 
-              src={post.images[0].url} 
-              alt="Post media" 
-              className="rounded-lg w-full object-cover cursor-zoom-in" 
-              width={600} 
-              height={400}
-              onClick={() => setZoomedImage(post.images[0].url)}
-            />
-          )}
-
-          {post.images.length === 2 && (
-            <div className="grid grid-cols-2 gap-3">
-              {post.images.map((img, i) => (
-                <Image 
-                  key={i} 
-                  src={img.url} 
-                  alt="Post media" 
-                  className="rounded-lg object-cover cursor-zoom-in" 
-                  width={600} 
-                  height={400}
-                  onClick={() => setZoomedImage(img.url)}
+  const handleShare = async (postId : string) => {
+      const shareUrl = `${window.location.origin}/feeds/post/${postId}`;
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    };
+    const togglelike = async (postId : string , )=> {
+      
+      const alreadyliked = likedIds.includes(postId) ;
+      // Find the actual post to get current like count
+      const currentPost = feeds.find(p => p._id === postId);
+      const currentLikes = currentPost?.likes ?? 0;
+      if (alreadyliked) {
+        setLikedIds(prev => prev.filter(id => id !== postId));   // remove
+           setFeedLikes(prev => ({
+      ...prev,
+       [postId]: currentLikes - 1 // Don't rely on feeds.find
+    }));
+      } else {
+        setLikedIds(prev => [...prev, postId]);  // add
+         setFeedLikes(prev => ({ 
+      ...prev, 
+      [postId]: currentLikes + 1 // Use actual current likes
+    }));
+      }
+      
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL||'http://localhost:3000';
+      const res = await fetch(`${baseUrl}/api/feeds/likepost`,{
+        method: "POST",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({postId , liked: !alreadyliked, email}),     
+      });
+      const data_likes = await res.json();
+    } catch (error) { 
+      console.log(error)
+      toast.error('failed to update like');
+      if (alreadyliked) {
+        setLikedIds(prev => [...prev, postId]);
+        setFeedLikes(prev => ({ ...prev, [postId]: currentLikes }));
+      } else {
+          setLikedIds(prev => prev.filter(id => id !== postId));
+          setFeedLikes(prev => ({ ...prev, [postId]: currentLikes }));
+      }   
+    }
+    }
+    const handleDownload = async (file: { url: string; name: string }| null) => {
+      if (!file) {
+          toast.error('File not available');
+          return;
+      }
+    try {
+      const response = await fetch(file.url);
+      const blob = await response.blob();
+      
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = file.name; // This will force the correct filename
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+      
+    } catch (err) {
+      toast.error('Download failed');
+    }
+  };
+  
+    // 👇 Show skeleton while loading
+    // Also show skeleton when fetching next page
+    return (
+      <div>
+        
+              {feeds.map((post , index) => { 
+                const isliked = likedIds.includes(post._id);  
+                const isLastPost = index ===feeds.length - 1;
+                const fullText = post.content || "";
+                const previewText =
+                  fullText.length > 120 && !expanded
+                    ? fullText.slice(0, 120) + "..."
+                    : fullText;
+                  // ✅ sanitize here
+                  const clean = DOMPurify.sanitize(previewText, {
+                    ALLOWED_TAGS: [
+                      "b", "i", "u", "em", "strong",
+                      "p", "br",
+                      "ul", "ol", "li",
+                      "blockquote",
+                      "h1", "h2",
+                      "a"
+                    ],
+                    ALLOWED_ATTR: ["href", "target"],
+                  });
+                  
+                return (
+                  <Card className="w-full max-w-[34rem] mx-auto rounded-lg shadow border border-gray-200 bg-white mb-6 pt-2 pb-2" key={post._id}  ref={isLastPost ? ref : null}>
+              {/* Someone liked/commented bar */}
+              <div className="w-full flex items-center gap-2 text-gray-500 text-sm py-2 px-3 sm:px-5 border-b border-gray-200">
+                <Image
+                  src="/logos/bake.jpg"   
+                  alt="User avatar"
+                  width={28}
+                  height={28}
+                  className="rounded-full border w-8 h-8"
                 />
-              ))}
-            </div>
-          )}
-
-          {post.images.length === 3 && (
-            <div className="grid grid-cols-2 gap-3">
-              <Image
-                src={post.images[0].url}
-                alt="Post media"
-                className="rounded-lg col-span-1 row-span-2 object-cover cursor-zoom-in"
-                width={600} 
-                height={400}
-                onClick={() => setZoomedImage(post.images[0].url)}
-              />
-              <div className="flex flex-col gap-2">
-                <Image 
-                  src={post.images[1].url} 
-                  alt="Post media" 
-                  className="rounded-lg object-cover cursor-zoom-in" 
-                  width={600} 
-                  height={400}
-                  onClick={() => setZoomedImage(post.images[1].url)}
-                />
-                <Image 
-                  src={post.images[2].url} 
-                  alt="Post media" 
-                  className="rounded-lg object-cover cursor-zoom-in" 
-                  width={600} 
-                  height={400}
-                  onClick={() => setZoomedImage(post.images[2].url)}
-                />
+                <span className="truncate">Emmanuel Lucius commented on this</span>
               </div>
-            </div>
-          )}
 
-          {post.images.length >= 4 && (
-            <div className="grid grid-cols-2 gap-3">
-              {post.images.slice(0, 4).map((img, i) => (
-                <div key={i} className="relative">
-                  <Image 
-                    src={img.url} 
-                    alt="Post media" 
-                    className="rounded-lg object-cover w-full h-full cursor-zoom-in" 
-                    width={600} 
-                    height={400}
-                    onClick={() => setZoomedImage(img.url)}
-                  />
-                  {i === 3 && post.images.length > 4 && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-lg font-semibold rounded-lg">
-                      +{post.images.length - 4}
+              <CardHeader className="flex flex-row items-center gap-2 px-3 py-1 sm:px-5 sm:py-2">
+                <Image
+                  src="/logos/bake.jpg"
+                  alt="User avatar"
+                  width={48}
+                  height={48}
+                  className="rounded-full border w-15 h-15 object-fill"
+                />
+                <div className="flex flex-col">
+                  <span className="font-semibold text-gray-900 text-base">{post.email}</span>
+                  <span className="text-xs text-gray-500">{new Date(post.createdAt).toLocaleString()}</span>
+                </div>
+              </CardHeader>
+
+              <CardContent className="px-3 py-2 sm:px-5 sm:py-3">
+                <div className="text-gray-900 text-[15px] leading-relaxed mb-2 break-words" 
+                  dangerouslySetInnerHTML={{ __html: clean }}
+                />
+                  <div>
+                    
+                  {fullText.length > 120 && (
+                    <button
+                      onClick={() => setExpanded(!expanded)}
+                      className="ml-1 text-blue-600 hover:underline focus:outline-none"
+                    >
+                      {expanded ? "Read less" : "Read more"}
+                    </button>
+                  )}
+                </div>
+
+                <div className={`rounded-lg overflow-hidden ${post.images.length>1 ? "border border-gray-100" : ""} mb-2 p-2 px-4`}>
+              {/* Images */}
+              {post.images && post.images.length > 0 && (
+                <div className="mt-2">
+                  {post.images.length === 1 && (
+                    <Image 
+                      src={post.images[0].url} 
+                      alt="Post media" 
+                      className="rounded-lg w-full object-cover cursor-zoom-in" 
+                      width={600} 
+                      height={400}
+                      onClick={() => setZoomedImage(post.images[0].url)}
+                    />
+                  )}
+
+                  {post.images.length === 2 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {post.images.map((img, i) => (
+                        <Image 
+                          key={i} 
+                          src={img.url} 
+                          alt="Post media" 
+                          className="rounded-lg object-cover cursor-zoom-in" 
+                          width={600} 
+                          height={400}
+                          onClick={() => setZoomedImage(img.url)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {post.images.length === 3 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Image
+                        src={post.images[0].url}
+                        alt="Post media"
+                        className="rounded-lg col-span-1 row-span-2 object-cover cursor-zoom-in"
+                        width={600} 
+                        height={400}
+                        onClick={() => setZoomedImage(post.images[0].url)}
+                      />
+                      <div className="flex flex-col gap-2">
+                        <Image 
+                          src={post.images[1].url} 
+                          alt="Post media" 
+                          className="rounded-lg object-cover cursor-zoom-in" 
+                          width={600} 
+                          height={400}
+                          onClick={() => setZoomedImage(post.images[1].url)}
+                        />
+                        <Image 
+                          src={post.images[2].url} 
+                          alt="Post media" 
+                          className="rounded-lg object-cover cursor-zoom-in" 
+                          width={600} 
+                          height={400}
+                          onClick={() => setZoomedImage(post.images[2].url)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {post.images.length >= 4 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {post.images.slice(0, 4).map((img, i) => (
+                        <div key={i} className="relative">
+                          <Image 
+                            src={img.url} 
+                            alt="Post media" 
+                            className="rounded-lg object-cover w-full h-full cursor-zoom-in" 
+                            width={600} 
+                            height={400}
+                            onClick={() => setZoomedImage(img.url)}
+                          />
+                          {i === 3 && post.images.length > 4 && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-lg font-semibold rounded-lg">
+                              +{post.images.length - 4}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-              ))}
+              )}
+
+              {/* Video */}
+              {post.video && (
+                <div className="relative mt-2 rounded-lg overflow-hidden"  
+                      onMouseEnter={() => handleMouseEnter(post._id)}
+                    onMouseLeave={() => handleMouseLeave(post._id)}
+                    >
+                  <video
+                    ref={setVideoRef(post._id)}
+                    className="w-full rounded-lg"
+                    src={post.video.url}
+                    onClick={() => handleToggle(post._id)}
+                    onEnded={() => handleVideoEnd(post._id)}
+                  />
+                  {(videoStates[post._id]?.showOverlay ?? true) && (
+                    <button
+                      onClick={() => handleToggle(post._id)}
+                      className="absolute inset-0 flex items-center justify-center bg-black/20"
+                    >
+                      <div className="w-16 h-16 flex items-center justify-center rounded-full bg-gray-700/70 text-white text-2xl">
+                        {videoStates[post._id]?.isPlaying ? <Pause /> : <Play />}
+                      </div>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* File */}
+              {post.file && (
+                <a
+                  onClick={(e) => {
+                        e.preventDefault();
+                        handleDownload(post?.file);
+                  }}
+                  
+                  className="block mt-2"
+                >
+                  <div className="flex flex-col items-center justify-center h-32 bg-gray-100 rounded-lg border border-gray-200"> {/* ← Added bg and border */}
+                    <File className="text-3xl mb-2" strokeWidth={2} />
+                    <span className="text-xs text-center truncate px-2">{post.file.name || "file"}</span>          
+                  </div>          
+                </a>
+              )}
+
+              {/* Zoom Modal */}
+              {zoomedImage && (
+                <div 
+                  className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
+                  onClick={() => setZoomedImage(null)}
+                >
+                  <div className="relative max-w-4xl max-h-full">
+                    <img
+                      src={zoomedImage} 
+                      className="max-w-full max-h-full object-contain"
+                    
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <button 
+                      className="absolute top-4 right-4 text-white text-2xl bg-black/50 rounded-full w-10 h-10 flex items-center justify-center"
+                      onClick={() => setZoomedImage(null)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
 
-      {/* Video */}
-      {post.video && (
-        <div className="relative mt-2 rounded-lg overflow-hidden"  
-              onMouseEnter={() => handleMouseEnter(post._id)}
-            onMouseLeave={() => handleMouseLeave(post._id)}
-             >
-          <video
-             ref={setVideoRef(post._id)}
-            className="w-full rounded-lg"
-            src={post.video.url}
-            onClick={() => handleToggle(post._id)}
-             onEnded={() => handleVideoEnd(post._id)}
-          />
-          {(videoStates[post._id]?.showOverlay ?? true) && (
-            <button
-              onClick={() => handleToggle(post._id)}
-              className="absolute inset-0 flex items-center justify-center bg-black/20"
-            >
-              <div className="w-16 h-16 flex items-center justify-center rounded-full bg-gray-700/70 text-white text-2xl">
-                 {videoStates[post._id]?.isPlaying ? <Pause /> : <Play />}
-              </div>
-            </button>
-          )}
-        </div>
-      )}
+                <div className="flex sm:flex-row justify-between items-start sm:items-center gap-2 text-gray-500 text-sm mb-1">
+                  <span className="flex gap-1 items-center">
+                    <Eye className="w-4 h-4" />
+                    <span>46</span>
+                  </span>
+                  <span>{feedLikes[post._id]??post.likes ?? 0 } Likes / (22) comments</span>
+                </div>
 
-      {/* File */}
-      {post.file && (
-        <a
-           onClick={(e) => {
-                e.preventDefault();
-                handleDownload(post?.file);
-          }}
-          
-          className="block mt-2"
-        >
-          <div className="flex flex-col items-center justify-center h-32 bg-gray-100 rounded-lg border border-gray-200"> {/* ← Added bg and border */}
-            <File className="text-3xl mb-2" strokeWidth={2} />
-            <span className="text-xs text-center truncate px-2">{post.file.name || "file"}</span>          
-          </div>          
-        </a>
-      )}
+                <div className="border-t border-gray-200 my-1" />
 
-      {/* Zoom Modal */}
-      {zoomedImage && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
-          onClick={() => setZoomedImage(null)}
-        >
-          <div className="relative max-w-4xl max-h-full">
-            <img
-              src={zoomedImage} 
-              className="max-w-full max-h-full object-contain"
-            
-              onClick={(e) => e.stopPropagation()}
+                <div className="flex sm:flex-row justify-between items-stretch sm:items-center text-gray-600 font-medium text-sm gap-2 mt-4">
+                  <button className="flex items-center gap-1 hover:text-blue-600 transition w-full sm:w-auto justify-center" onClick={()=>togglelike( post._id ) }>
+                          <Heart className={`w-5 h-5 ${isliked ? "text-blue-600" : ""}`}
+                                  fill={isliked ? "currentColor" : "none"} />
+              {isliked ? "Liked" : "Like"}
+                  </button>
+                  <button className="flex items-center gap-1 hover:text-blue-600 transition w-full sm:w-auto justify-center" onClick={() => setCommentSection(!commentSection)} >
+                    <MessageCircle className="w-5 h-5" /> Comment
+                  </button>
+                  <div className="relative flex items-center w-full sm:w-auto justify-center">
+                  <button
+                    className="flex items-center gap-1 hover:text-blue-600 transition w-full sm:w-auto justify-center"
+                    onClick={()=>handleShare(post._id)}
+                    title="Copy post link"
+                  >
+                    <Share className="w-5 h-5" /> Share
+                  </button>
+                  {copied && (
+                    <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 shadow">
+                      Copied!
+                    </span>
+                  )}
+                </div>
+                </div>
+              </CardContent>
+              {commentSection && (
+                <CardFooter className="flex flex-col gap-3 border-t border-gray-200 p-4">
+                  <div className="send flex flex-row items-center gap-2 w-full">
+                    {/* Comment input */}
+                  <textarea
+          className="w-full h-10 border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
+          placeholder="Write a comment..."
+          maxLength={200}
+        />
+                  {/* Post button */}
+                  <button className="self-end px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                    Send
+                  </button>
+                  </div>
+
+                  {/* Example comment list */}
+                  <div className="w-full space-y-3 mt-2">
+          {/* Comment 1 */}
+          <div className="flex items-start gap-3">
+            <Image
+              src="/logos/bake.jpg"
+              alt="Jane's avatar"
+              width={30}
+              height={30}
+              className="rounded-full border w-13 h-13 object-fill"
             />
-            <button 
-              className="absolute top-4 right-4 text-white text-2xl bg-black/50 rounded-full w-10 h-10 flex items-center justify-center"
-              onClick={() => setZoomedImage(null)}
-            >
-              ✕
-            </button>
+            <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2">
+              <span className="font-semibold text-sm text-gray-900">Jane</span>
+              <p className="text-gray-800 text-sm mt-0.5">Nice post!</p>
+              <div className="flex gap-4 mt-1 text-xs text-gray-500">
+                <button className="hover:underline">Like</button>
+                <button className="hover:underline">Reply</button>
+                <span>2h</span>
+              </div>
+            </div>
+          </div>
+          {/* Divider */}
+          <div className="border-b border-gray-200" />
+
+          {/* Comment 2 */}
+          <div className="flex items-start gap-3">
+            <Image
+              src="/logos/bake.jpg"
+              alt="John's avatar"
+              width={30}
+              height={30}
+              className="rounded-full border w-12 h-12"
+            />
+            <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2">
+              <span className="font-semibold text-sm text-gray-900">John</span>
+              <p className="text-gray-800 text-sm mt-0.5">I agree 👍</p>
+              <div className="flex gap-4 mt-1 text-xs text-gray-500">
+                <button className="hover:underline">Like</button>
+                <button className="hover:underline">Reply</button>
+                <span>1h</span>
+              </div>
+            </div>
           </div>
         </div>
-      )}
-    </div>
+                </CardFooter>
+              )}
+              
+            </Card>
+                );
+              })}
+              {/* Show loading skeleton at the BOTTOM when fetching more */}
+              {isFetchingNextPage && <PostsSkeleton count={3} />}
 
-        <div className="flex sm:flex-row justify-between items-start sm:items-center gap-2 text-gray-500 text-sm mb-1">
-          <span className="flex gap-1 items-center">
-            <Eye className="w-4 h-4" />
-            <span>46</span>
-          </span>
-          <span>{feedLikes[post._id]??post.likes ?? 0 } Likes / (22) comments</span>
-        </div>
-
-        <div className="border-t border-gray-200 my-1" />
-
-        <div className="flex sm:flex-row justify-between items-stretch sm:items-center text-gray-600 font-medium text-sm gap-2 mt-4">
-          <button className="flex items-center gap-1 hover:text-blue-600 transition w-full sm:w-auto justify-center" onClick={()=>togglelike( post._id ) }>
-                  <Heart className={`w-5 h-5 ${isliked ? "text-blue-600" : ""}`}
-                          fill={isliked ? "currentColor" : "none"} />
-      {isliked ? "Liked" : "Like"}
-          </button>
-          <button className="flex items-center gap-1 hover:text-blue-600 transition w-full sm:w-auto justify-center" onClick={() => setCommentSection(!commentSection)} >
-            <MessageCircle className="w-5 h-5" /> Comment
-          </button>
-          <div className="relative flex items-center w-full sm:w-auto justify-center">
-          <button
-            className="flex items-center gap-1 hover:text-blue-600 transition w-full sm:w-auto justify-center"
-            onClick={()=>handleShare(post._id)}
-            title="Copy post link"
-          >
-            <Share className="w-5 h-5" /> Share
-          </button>
-          {copied && (
-            <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 shadow">
-              Copied!
-            </span>
-          )}
-        </div>
-        </div>
-      </CardContent>
-      {commentSection && (
-         <CardFooter className="flex flex-col gap-3 border-t border-gray-200 p-4">
-          <div className="send flex flex-row items-center gap-2 w-full">
-            {/* Comment input */}
-          <textarea
-  className="w-full h-10 border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
-  placeholder="Write a comment..."
-  maxLength={200}
-/>
-          {/* Post button */}
-          <button className="self-end px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-            Send
-          </button>
-          </div>
-
-          {/* Example comment list */}
-          <div className="w-full space-y-3 mt-2">
-  {/* Comment 1 */}
-  <div className="flex items-start gap-3">
-    <Image
-      src="/logos/bake.jpg"
-      alt="Jane's avatar"
-      width={30}
-      height={30}
-      className="rounded-full border w-13 h-13 object-fill"
-    />
-    <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2">
-      <span className="font-semibold text-sm text-gray-900">Jane</span>
-      <p className="text-gray-800 text-sm mt-0.5">Nice post!</p>
-      <div className="flex gap-4 mt-1 text-xs text-gray-500">
-        <button className="hover:underline">Like</button>
-        <button className="hover:underline">Reply</button>
-        <span>2h</span>
+              {/* Show end message */}
+              {!hasNextPage && feeds.length > 0 && (
+                <p className="text-center text-gray-500 py-8">
+                  🎉 You&apos;ve seen all posts!
+                </p>
+                  )}
       </div>
-    </div>
-  </div>
-  {/* Divider */}
-  <div className="border-b border-gray-200" />
-
-  {/* Comment 2 */}
-  <div className="flex items-start gap-3">
-    <Image
-      src="/logos/bake.jpg"
-      alt="John's avatar"
-      width={30}
-      height={30}
-      className="rounded-full border w-12 h-12"
-    />
-    <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2">
-      <span className="font-semibold text-sm text-gray-900">John</span>
-      <p className="text-gray-800 text-sm mt-0.5">I agree 👍</p>
-      <div className="flex gap-4 mt-1 text-xs text-gray-500">
-        <button className="hover:underline">Like</button>
-        <button className="hover:underline">Reply</button>
-        <span>1h</span>
-      </div>
-    </div>
-  </div>
-</div>
-        </CardFooter>
-      )}
-      
-    </Card>
-        );
-      })}
-    </div>
-  )
-}
+    )
+  }

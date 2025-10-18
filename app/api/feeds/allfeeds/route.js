@@ -4,17 +4,19 @@ import { auth } from '@/app/api/auth/[...nextauth]/auth'
 export async function GET(req) {
   try {
      const session = await auth();
-
    if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
    const email = session?.user.email;
+  const { searchParams } = new URL(req.url);
+  const page = parseInt(searchParams.get("page")) || 1;
+  const limit = parseInt(searchParams.get("limit")) || 10;
 
   // offline work
   //const { searchParams } = new URL(req.url);
   
  // const email = searchParams.get("email");
-  const feeds = await allfeeds(email);
+  const feeds = await allfeeds(email, page, limit);
   return NextResponse.json(feeds, { status: 200 });
   } catch (error) {
     const isDbError = error.message?.includes('MongoNetworkError') || error.message?.includes('ENOTFOUND');
