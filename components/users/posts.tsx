@@ -359,6 +359,8 @@
                 return (
                   <Card className="w-full max-w-[34rem] mx-auto rounded-lg shadow border border-gray-200 bg-white mb-6 pt-2 pb-2" key={post._id}  ref={isLastPost ? ref : null}>
               {/* Someone liked/commented bar */}
+              {post.likedByFriends.length > 0 && (
+                <>
               <div className="w-full flex items-center flex-row gap-2 text-gray-500 text-sm py-2 px-3 sm:px-5 border-b border-gray-200">
                {/* For single like */}
               {post.likedByFriends.length === 1 && (
@@ -386,6 +388,8 @@
                   </div>
                 )}
               </div>
+              </>
+              )}
 
               <CardHeader className="flex flex-row items-center gap-2 px-3 py-1 sm:px-5 sm:py-2">
                 <UserAvatar 
