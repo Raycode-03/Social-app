@@ -11,13 +11,26 @@ export async function allfeeds(email, page, limit) {
   const user = await db.collection('users').findOne({ email });
   if (!user) throw new Error('User not found');
   const userId = user._id;
-    
-  // friend IDs
+      // friend IDs
   const friendsDocs = await db.collection('friends')
     .find({ userId })
     .toArray();
   const friendIds = friendsDocs.map(f => f.friendId);
-    
+    // Get ALL users data (not just emails)
+  const allUserIds = [userId, ...friendIds];
+  const relevantUsers = await db.collection('users')
+    .find({ _id: { $in: allUserIds } })
+    .project({ email: 1, avatar: 1, name: 1 })
+    .toArray();
+  
+  // Create a map for quick user data lookup
+  const userMap = new Map();
+  relevantUsers.forEach(u => {
+    userMap.set(u.email, {
+      avatar: u.avatar || u.email.split('@')[0], // Fixed typo: splilt -> split
+      name: u.name || u.email.split('@')[0]
+    });
+  });
   // friends' emails
   const friendUsers = await db.collection('users')
     .find({ _id: { $in: friendIds } })
@@ -32,7 +45,7 @@ export async function allfeeds(email, page, limit) {
     .toArray();
 
   const friendsPosts = await db.collection('posts')
-    .find({ email: { $in: friendEmails } })
+  .find({ email: { $in: Array.from(userMap.keys()) } })
     .sort({ createdAt: -1 })
     .toArray();
 
@@ -56,7 +69,15 @@ export async function allfeeds(email, page, limit) {
     .find({ _id: { $in: friendLikes.map(l => l.postId) } })
     .sort({ createdAt: -1 })
     .toArray();
-
+  // After getting friendLikes, create a map for quick lookup
+  const likesByPostId = new Map();
+  friendLikes.forEach(like => {
+    const postIdStr = like.postId.toString();
+    if (!likesByPostId.has(postIdStr)) {
+      likesByPostId.set(postIdStr, []);
+    }
+    likesByPostId.get(postIdStr).push(like.email);
+  });
   const combined = [
     ...userPosts,
     ...friendsPosts,
@@ -91,18 +112,39 @@ export async function allfeeds(email, page, limit) {
   if (duplicateIds.length > 0) {
     console.log('DUPLICATE IDs FOUND:', duplicateIds);
   }
-  return {
-    posts: resultPosts.map(post => ({
+  // After combining and removing duplicates, add user data to each post
+  const postsWithUserData = resultPosts.map(post => {
+    const userData = userMap.get(post.email);
+    const avatar = userData ? userData.avatar : post.email.split('@')[0];
+    // Get friends who liked this post
+    const postIdStr = post._id.toString();
+    const friendLikersEmails = likesByPostId.get(postIdStr) || [];
+    // Convert to user data objects
+    const likedByFriends = friendLikersEmails.map(email => {
+      const friendData = userMap.get(email);
+      return {
+        name: friendData ? friendData.name : email.split('@')[0],
+        avatar: friendData ? friendData.avatar : email.split('@')[0],
+        email: email
+      };
+    });
+    return {
       ...post,
       images: post.images || [],
       video: post.video || null,
       file: post.file || null,
-    })),
+      avatar: avatar,
+      likedByFriends: likedByFriends,
+    };
+  });
+   return {
+    posts: postsWithUserData,
     hasMore,
     currentPage: page,
-    totalPosts: unique.length // For debugging
+    totalPosts: unique.length
   };
 }
+
 export async function  likepost(postId , liked , email){
   await connect_db(); 
   const db = get_db();

@@ -7,18 +7,24 @@
   import {Card,CardContent,CardFooter,CardHeader} from "@/components/ui/card"
   import DOMPurify from "dompurify"
   import { Eye, Heart, MessageCircle, Share , Pause, Play , File} from "lucide-react"
-  // import InfiniteScroll from 'react-infinite-scroll-component';
   import { useInView } from 'react-intersection-observer'
   import { useInfiniteQuery } from '@tanstack/react-query'
   import PostsSkeleton from "./skeleton";
+  import { UserAvatar } from "./userAvatar"
   interface mediaItem {
     url : string;
     name: string;
     
   }
+  interface User {
+  email: string;
+  name: string;
+  avatar: string;
+}
   interface FeedPost {
     _id: string;
     email: string;
+    avatar:string; 
     content: string;
     createdAt: string;
     likes: number;
@@ -26,27 +32,45 @@
     images: mediaItem [];
     video: mediaItem | null;
     userLiked: boolean;
-    // add other fields as needed (images, comments, etc.)
+    commentCount: number; 
+    likedByFriends: User[];
   }
   interface PostsResponse {
     posts: FeedPost[];
     hasMore: boolean;
     currentPage: number;
   }
+  interface Comment {
+  _id: string;
+  postId: string;
+  user: User; 
+  content: string;
+  createdAt: string;
+  likes: number;
+  userLiked: boolean;
+}
+
 
   export default function Page({ email }: { email: string  | null}) {
     // for the infinte scroll
-    // loading skeleton
-    const [loadSkeleton , setloadSkeleton] = useState(true)
-    const [expanded, setExpanded] = useState(false);
-    const [likedIds, setLikedIds] = useState<string[]>([]); 
-    const [commentSection, setCommentSection] = useState(false)
+    const [expandedContent, setExpandedContent] = useState<Record<string, boolean>>({});
+    const [commentSection, setCommentSection] = useState<Record<string, boolean>>({});
+    // const [commentText , setCommentText] = useState("");
+    // const [commentList , setCommentList] = useState([]);
+    const [commentInputs , setCommentInputs] = useState<Record<string, string>>({});
     const [copied, setCopied] = useState(false);
     const [feeds, setFeeds] = useState<FeedPost[]>([]);
     const [zoomedImage, setZoomedImage] = useState<string | null>(null);
-    const [feedLikes, setFeedLikes] = useState<Record<string, number>>({});
+    // Single source of truth for post states
+      const [postStates, setPostStates] = useState<Record<string, { 
+        likes: number; 
+        userLiked: boolean;
+        isUpdating: boolean;
+        comments: Comment[];
+        isAddingComment: boolean;
+        commentCount: number; // Store count from post fetch
+      }>>({});
     // for video play/pause
-
     const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
     const [videoStates, setVideoStates] = useState<{[key: string]: { isPlaying: boolean; showOverlay: boolean }}>({});
 
@@ -166,19 +190,41 @@
     if (data) {
       const allPosts = data.pages.flatMap(page => page.posts);
       setFeeds(allPosts);
-        // Get liked posts from the actual data (userLiked field from backend)
-    const liked = allPosts
-      .filter(post => post.userLiked === true) // Use the backend value
-      .map(post => post._id);
-    
-    console.log('Liked IDs from backend:', liked); // Debug log
-    setLikedIds(liked);
+        
+       // Initialize post states from server data
+      const initialPostStates: Record<string, { likes: number; userLiked: boolean; isUpdating: boolean, comments: Comment[];isAddingComment: boolean; commentCount: number; }> = {};
+      allPosts.forEach(post => {
+        initialPostStates[post._id] = {
+          likes: post.likes,
+          userLiked: post.userLiked,
+          isUpdating: false,
+          comments: [], // Start with empty comments
+          isAddingComment: false,
+          commentCount: post.commentCount || 0
+        };
+      });
+      setPostStates(initialPostStates);
     }
   }, [data]);
-    if (isLoading) {
-      return <PostsSkeleton count={5} />;
-    }
-
+    
+  // Custom hook for fetching comments
+  // const useComments = (postId: string, enabled: boolean) => {
+  //   return useQuery({
+  //     queryKey: ['comments', postId],
+  //     queryFn: async () => {
+  //       const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  //       const res = await fetch(`${baseUrl}/api/feeds/allfeeds/comments?postId=${postId}&email=${email}`);
+        
+  //       if (!res.ok) {
+  //         throw new Error('Failed to fetch comments');
+  //       }
+        
+  //       return res.json();
+  //     },
+  //     enabled: enabled && !!postId, // Only fetch when enabled
+  //     staleTime: 1000 * 60 * 5, // 5 minutes
+  //   });
+  // }
     // socket for real-time updates
   // useEffect(() => {
   //   socket.on("postLiked", (data) => {
@@ -197,43 +243,57 @@
       setTimeout(() => setCopied(false), 1500);
     };
     const togglelike = async (postId : string , )=> {
-      
-      const alreadyliked = likedIds.includes(postId) ;
-      // Find the actual post to get current like count
-      const currentPost = feeds.find(p => p._id === postId);
-      const currentLikes = currentPost?.likes ?? 0;
-      if (alreadyliked) {
-        setLikedIds(prev => prev.filter(id => id !== postId));   // remove
-           setFeedLikes(prev => ({
+      const currentState = postStates[postId];
+    if (!currentState || currentState.isUpdating) return;
+
+    const currentLikes = currentState.likes;
+    const currentlyLiked = currentState.userLiked;
+       // Optimistic update
+    setPostStates(prev => ({
       ...prev,
-       [postId]: currentLikes - 1 // Don't rely on feeds.find
-    }));
-      } else {
-        setLikedIds(prev => [...prev, postId]);  // add
-         setFeedLikes(prev => ({ 
-      ...prev, 
-      [postId]: currentLikes + 1 // Use actual current likes
-    }));
+      [postId]: {
+        likes: currentlyLiked ? currentLikes - 1 : currentLikes + 1,
+        userLiked: !currentlyLiked,
+        isUpdating: true,
+        comments: currentState.comments, // explicitly include
+      isAddingComment: currentState.isAddingComment, // explicitly include
+      commentCount: currentState.commentCount // explicitly include
       }
+    }));
       
     try {
       const baseUrl = process.env.NEXTAUTH_URL||'http://localhost:3000';
       const res = await fetch(`${baseUrl}/api/feeds/likepost`,{
         method: "POST",
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({postId , liked: !alreadyliked, email}),     
+        body: JSON.stringify({postId , liked: !currentlyLiked, email}),     
       });
-      const data_likes = await res.json();
+      if (!res.ok) {
+        toast.error('failed to update like');
+      }
+       const data = await res.json(); 
+         // Update with server response if available, otherwise keep optimistic state
+      setPostStates(prev => ({
+        ...prev,
+        [postId]: {
+          likes: data.likes ?? (currentlyLiked ? currentLikes - 1 : currentLikes + 1),
+          userLiked: data.userLiked ?? !currentlyLiked,
+          isUpdating: false,
+          comments: currentState.comments, // explicitly include
+      isAddingComment: currentState.isAddingComment, // explicitly include
+      commentCount: currentState.commentCount // explicitly include
+        }
+      }));
     } catch (error) { 
       console.log(error)
       toast.error('failed to update like');
-      if (alreadyliked) {
-        setLikedIds(prev => [...prev, postId]);
-        setFeedLikes(prev => ({ ...prev, [postId]: currentLikes }));
-      } else {
-          setLikedIds(prev => prev.filter(id => id !== postId));
-          setFeedLikes(prev => ({ ...prev, [postId]: currentLikes }));
-      }   
+       setPostStates(prev => ({
+        ...prev,
+        [postId]: {
+          ...currentState,
+          isUpdating: false
+        }
+      }));
     }
     }
     const handleDownload = async (file: { url: string; name: string }| null) => {
@@ -255,21 +315,32 @@
       window.URL.revokeObjectURL(downloadUrl);
       
     } catch (err) {
+      console.log(err);
       toast.error('Download failed');
     }
   };
-  
     // 👇 Show skeleton while loading
+    if (isLoading) {
+      return <PostsSkeleton count={5} />;
+    }
     // Also show skeleton when fetching next page
     return (
       <div>
         
               {feeds.map((post , index) => { 
-                const isliked = likedIds.includes(post._id);  
+                const postState = postStates[post._id] || { 
+                    likes: post.likes, 
+                    userLiked: post.userLiked, 
+                    isUpdating: false,
+                    comments: [],
+                    isAddingComment: false,
+                    commentCount: post.commentCount 
+                };
                 const isLastPost = index ===feeds.length - 1;
                 const fullText = post.content || "";
+                const isExpanded = expandedContent[post._id] || false;
                 const previewText =
-                  fullText.length > 120 && !expanded
+                  fullText.length > 120 && !isExpanded
                     ? fullText.slice(0, 120) + "..."
                     : fullText;
                   // ✅ sanitize here
@@ -288,25 +359,41 @@
                 return (
                   <Card className="w-full max-w-[34rem] mx-auto rounded-lg shadow border border-gray-200 bg-white mb-6 pt-2 pb-2" key={post._id}  ref={isLastPost ? ref : null}>
               {/* Someone liked/commented bar */}
-              <div className="w-full flex items-center gap-2 text-gray-500 text-sm py-2 px-3 sm:px-5 border-b border-gray-200">
-                <Image
-                  src="/logos/bake.jpg"   
-                  alt="User avatar"
-                  width={28}
-                  height={28}
-                  className="rounded-full border w-8 h-8"
-                />
-                <span className="truncate">Emmanuel Lucius commented on this</span>
+              <div className="w-full flex items-center flex-row gap-2 text-gray-500 text-sm py-2 px-3 sm:px-5 border-b border-gray-200">
+               {/* For single like */}
+              {post.likedByFriends.length === 1 && (
+                  <div className="flex items-center gap-2">
+                    <UserAvatar avatar={post.likedByFriends[0].avatar} email={post.likedByFriends[0].email} size={43} className=""/>
+                    <span className="font-bold">{post.likedByFriends[0].name} liked this</span>
+                  </div>
+                )}
+
+               {/* For multiple likes - show first 2-3 avatars */}
+                {post.likedByFriends.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex -space-x-2">
+                      {post.likedByFriends.slice(0, 3).map((friend) => (
+                        <UserAvatar 
+                          key={friend.email}
+                          avatar={friend.avatar} 
+                          email={friend.email} 
+                          size={35}
+                          className="border-2 border-white"
+                        />
+                      ))}
+                    </div>
+                   <span className="font-bold"> {post.likedByFriends[0].name} and {post.likedByFriends.length - 1} others liked this</span>
+                  </div>
+                )}
               </div>
 
               <CardHeader className="flex flex-row items-center gap-2 px-3 py-1 sm:px-5 sm:py-2">
-                <Image
-                  src="/logos/bake.jpg"
-                  alt="User avatar"
-                  width={48}
-                  height={48}
-                  className="rounded-full border w-15 h-15 object-fill"
-                />
+                <UserAvatar 
+                avatar={post.avatar}
+                email={post.email} 
+                size={48}
+                className="border-2 border-gray-200"
+              />
                 <div className="flex flex-col">
                   <span className="font-semibold text-gray-900 text-base">{post.email}</span>
                   <span className="text-xs text-gray-500">{new Date(post.createdAt).toLocaleString()}</span>
@@ -321,10 +408,14 @@
                     
                   {fullText.length > 120 && (
                     <button
-                      onClick={() => setExpanded(!expanded)}
+                      onClick={() => setExpandedContent(prev => ({
+                        ...prev,
+                        [post._id]: !prev[post._id]
+                      }))
+                    }
                       className="ml-1 text-blue-600 hover:underline focus:outline-none"
                     >
-                      {expanded ? "Read less" : "Read more"}
+                      {isExpanded ? "Read less" : "Read more"}
                     </button>
                   )}
                 </div>
@@ -341,6 +432,7 @@
                       width={600} 
                       height={400}
                       onClick={() => setZoomedImage(post.images[0].url)}
+                      unoptimized={true}
                     />
                   )}
 
@@ -355,6 +447,7 @@
                           width={600} 
                           height={400}
                           onClick={() => setZoomedImage(img.url)}
+                          unoptimized={true}
                         />
                       ))}
                     </div>
@@ -369,6 +462,7 @@
                         width={600} 
                         height={400}
                         onClick={() => setZoomedImage(post.images[0].url)}
+                        unoptimized={true}
                       />
                       <div className="flex flex-col gap-2">
                         <Image 
@@ -378,6 +472,7 @@
                           width={600} 
                           height={400}
                           onClick={() => setZoomedImage(post.images[1].url)}
+                          unoptimized={true}
                         />
                         <Image 
                           src={post.images[2].url} 
@@ -386,6 +481,7 @@
                           width={600} 
                           height={400}
                           onClick={() => setZoomedImage(post.images[2].url)}
+                          unoptimized={true}
                         />
                       </div>
                     </div>
@@ -402,6 +498,7 @@
                             width={600} 
                             height={400}
                             onClick={() => setZoomedImage(img.url)}
+                            unoptimized={true}
                           />
                           {i === 3 && post.images.length > 4 && (
                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-lg font-semibold rounded-lg">
@@ -427,6 +524,7 @@
                     src={post.video.url}
                     onClick={() => handleToggle(post._id)}
                     onEnded={() => handleVideoEnd(post._id)}
+                
                   />
                   {(videoStates[post._id]?.showOverlay ?? true) && (
                     <button
@@ -439,6 +537,7 @@
                     </button>
                   )}
                 </div>
+                
               )}
 
               {/* File */}
@@ -464,12 +563,15 @@
                   className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
                   onClick={() => setZoomedImage(null)}
                 >
-                  <div className="relative max-w-4xl max-h-full">
-                    <img
-                      src={zoomedImage} 
-                      className="max-w-full max-h-full object-contain"
-                    
-                      onClick={(e) => e.stopPropagation()}
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <Image
+                     src={zoomedImage} 
+                    className="max-w-full max-h-full object-contain"
+                    alt="Zoomed post image"
+                    fill={true} // Use fill instead of width/height
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 60vw"
+                    onClick={(e) => e.stopPropagation()}
+                    unoptimized={true}
                     />
                     <button 
                       className="absolute top-4 right-4 text-white text-2xl bg-black/50 rounded-full w-10 h-10 flex items-center justify-center"
@@ -487,18 +589,21 @@
                     <Eye className="w-4 h-4" />
                     <span>46</span>
                   </span>
-                  <span>{feedLikes[post._id]??post.likes ?? 0 } Likes / (22) comments</span>
+                  <span>{postState.likes } Likes / (22) comments</span>
                 </div>
 
                 <div className="border-t border-gray-200 my-1" />
 
                 <div className="flex sm:flex-row justify-between items-stretch sm:items-center text-gray-600 font-medium text-sm gap-2 mt-4">
                   <button className="flex items-center gap-1 hover:text-blue-600 transition w-full sm:w-auto justify-center" onClick={()=>togglelike( post._id ) }>
-                          <Heart className={`w-5 h-5 ${isliked ? "text-blue-600" : ""}`}
-                                  fill={isliked ? "currentColor" : "none"} />
-              {isliked ? "Liked" : "Like"}
+                          <Heart className={`w-5 h-5 ${postState.userLiked ? "text-blue-600" : ""}`}
+                                  fill={postState.userLiked ? "currentColor" : "none"} />
+              {postState.userLiked ? "Liked" : "Like"}
                   </button>
-                  <button className="flex items-center gap-1 hover:text-blue-600 transition w-full sm:w-auto justify-center" onClick={() => setCommentSection(!commentSection)} >
+                  <button className="flex items-center gap-1 hover:text-blue-600 transition w-full sm:w-auto justify-center"  onClick={() => setCommentSection(prev => ({
+                        ...prev,
+                        [post._id]: !prev[post._id]
+                      }))}>
                     <MessageCircle className="w-5 h-5" /> Comment
                   </button>
                   <div className="relative flex items-center w-full sm:w-auto justify-center">
@@ -517,8 +622,8 @@
                 </div>
                 </div>
               </CardContent>
-              {commentSection && (
-                <CardFooter className="flex flex-col gap-3 border-t border-gray-200 p-4">
+              {commentSection[post._id] && (
+              <CardFooter className="flex flex-col gap-3 border-t border-gray-200 p-4">
                   <div className="send flex flex-row items-center gap-2 w-full">
                     {/* Comment input */}
                   <textarea
@@ -533,52 +638,33 @@
                   </div>
 
                   {/* Example comment list */}
-                  <div className="w-full space-y-3 mt-2">
-          {/* Comment 1 */}
-          <div className="flex items-start gap-3">
-            <Image
-              src="/logos/bake.jpg"
-              alt="Jane's avatar"
-              width={30}
-              height={30}
-              className="rounded-full border w-13 h-13 object-fill"
-            />
-            <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2">
-              <span className="font-semibold text-sm text-gray-900">Jane</span>
-              <p className="text-gray-800 text-sm mt-0.5">Nice post!</p>
-              <div className="flex gap-4 mt-1 text-xs text-gray-500">
-                <button className="hover:underline">Like</button>
-                <button className="hover:underline">Reply</button>
-                <span>2h</span>
-              </div>
-            </div>
-          </div>
-          {/* Divider */}
-          <div className="border-b border-gray-200" />
-
-          {/* Comment 2 */}
-          <div className="flex items-start gap-3">
-            <Image
-              src="/logos/bake.jpg"
-              alt="John's avatar"
-              width={30}
-              height={30}
-              className="rounded-full border w-12 h-12"
-            />
-            <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2">
-              <span className="font-semibold text-sm text-gray-900">John</span>
-              <p className="text-gray-800 text-sm mt-0.5">I agree 👍</p>
-              <div className="flex gap-4 mt-1 text-xs text-gray-500">
-                <button className="hover:underline">Like</button>
-                <button className="hover:underline">Reply</button>
-                <span>1h</span>
-              </div>
-            </div>
-          </div>
-        </div>
-                </CardFooter>
-              )}
-              
+                <div className="w-full space-y-3 mt-2">
+                  {postState.comments.map((comment) => (
+                    <div key={comment._id}>
+                      <div className="flex items-start gap-3">
+                        <UserAvatar 
+                          user={comment.user} 
+                          size={36}
+                          className="border border-gray-300"
+                        />
+                        <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2">
+                          <span className="font-semibold text-sm text-gray-900">
+                            {comment.user.name || comment.user.email}
+                          </span>
+                          <p className="text-gray-800 text-sm mt-0.5">{comment.content}</p>
+                          <div className="flex gap-4 mt-1 text-xs text-gray-500">
+                            <button className="hover:underline">Like</button>
+                            <button className="hover:underline">Reply</button>
+                            <span>{new Date(comment.createdAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="border-b border-gray-200 my-2" />
+                    </div>
+                  ))}
+                </div>
+              </CardFooter>
+            )}
             </Card>
                 );
               })}

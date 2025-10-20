@@ -217,7 +217,7 @@ const handleSignOut = async () => {
           {!showsearchmobile && (
             
           <span className="flex items-center">
-            <Image src={"logos/flowline.svg"} alt="flowline logo" width={23} height={23}   className=" min-w-[23px] min-h-23 mr-3"/>
+            <Image src={"/logos/flowline.svg"} alt="flowline logo" width={3} height={3}   className=" min-w-[23px] min-h-23 mr-3 object-contain" />
 
             {!ismobile && <p className="text-[1.0rem] text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Flowline</p>}
           </span>
