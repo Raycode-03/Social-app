@@ -9,7 +9,8 @@
   import { Eye, Heart, MessageCircle, Share , Pause, Play , File} from "lucide-react"
   import { useInView } from 'react-intersection-observer'
   import { useInfiniteQuery } from '@tanstack/react-query'
-  import PostsSkeleton from "./skeleton";
+  import {PostsSkeleton} from "./skeleton";
+  import {PostsSkeletonComment} from "./skeleton";
   import { UserAvatar } from "./userAvatar"
   interface mediaItem {
     url : string;
@@ -43,21 +44,35 @@
   interface Comment {
   _id: string;
   postId: string;
+  isOpen:boolean;
   user: User; 
   content: string;
-  createdAt: string;
+  email:string;
+  createdAt:string;
   likes: number;
-  userLiked: boolean;
+  userLiked: boolean; 
+}
+interface NavbarProps {
+    user?: {
+        id: string;
+        name?: string | null;
+        email?: string | null;
+        avatar?: string;
+        isAdmin: boolean;
+        packageType: string;
+    }
 }
 
-
-  export default function Page({ email }: { email: string  | null}) {
+  export default function Page( {user}: NavbarProps) {
+    const email = user?.email || "";
     // for the infinte scroll
     const [expandedContent, setExpandedContent] = useState<Record<string, boolean>>({});
     const [commentSection, setCommentSection] = useState<Record<string, boolean>>({});
-    // const [commentText , setCommentText] = useState("");
-    // const [commentList , setCommentList] = useState([]);
-    const [commentInputs , setCommentInputs] = useState<Record<string, string>>({});
+    const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({});
+    const [sendingComments, setSendingComments] = useState(false);
+    const [commentData, setCommentData] = useState<Record<string, Comment[]>>({});
+    const [commentText , setCommentText] = useState("");
+    // const [commentInputs , setCommentInputs] = useState<Record<string, string>>({});
     const [copied, setCopied] = useState(false);
     const [feeds, setFeeds] = useState<FeedPost[]>([]);
     const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -142,15 +157,15 @@
     const router = useRouter();
         //fetch posts from the database
         // REPLACE your manual fetch with React Query
-    const {
-      data,
-      fetchNextPage,
-      hasNextPage,
-      isFetchingNextPage,
-      isLoading,
-    } = useInfiniteQuery({
-      queryKey: ['posts', email],
-      queryFn: async ({ pageParam = 1 }) => {
+      const {
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading,
+      } = useInfiniteQuery({
+        queryKey: ['posts', email],
+        queryFn: async ({ pageParam = 1 }) => {
         const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
         const res = await fetch(`${baseUrl}/api/feeds/allfeeds?email=${email}&page=${pageParam}&limit=5`);
         
@@ -176,15 +191,82 @@
 
     // Simple intersection observer
     const { ref, inView } = useInView();
-
     useEffect(() => {
       if (inView && hasNextPage) {
         fetchNextPage();
       }
     }, [inView, hasNextPage, fetchNextPage]);
+    // Custom hook for fetching comments
+   const fetchComments = async (postId: string) => {
+  setLoadingComments(prev => ({ ...prev, [postId]: true }));
+  try {
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const res = await fetch(`${baseUrl}/api/feeds/comments`, {
+      method: "POST",
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ postId }),     
+    });
+    const data = await res.json();
+    console.log(data, "data for the comments");
+    
+    if (!res.ok) {
+      toast.error(data.error || "Unable to fetch comments");
+      return;
+    }
+    
+    setCommentData(prev => ({
+      ...prev,
+      [postId]: data || []
+    }));
+  } catch (err) {
+    toast.error("Failed to fetch comments");
+    console.log(err);
+  } finally {
+    setLoadingComments(prev => ({ ...prev, [postId]: false }));
+  }
+};
 
+// Then use it in both places
+useEffect(() => {
+  Object.keys(commentSection).forEach(postId => {
+    if (commentSection[postId] && !commentData[postId]) {
+      fetchComments(postId);
+    }
+  });
+}, [commentSection]);
+
+  // send a comment
+  const handleSubmitComment = async(postId: string) =>{
+    setSendingComments(true);
+   if (!commentText.trim()) {
+    toast.error("Comment cannot be empty");
+    return;
+  }
+  
+  try {
+    const res = await fetch(`/api/feeds/newcomment`, {
+      method: "POST",
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ content: commentText, postId: postId, email })
+    });
+    console.log(postId, email, commentText, "comment data");
+    const data = await res.json();
     
+    if (!res.ok) {
+      toast.error(data.error || "Failed to send comment");
+      return;
+    }
+    // Success
+    setCommentText(''); // Clear the input
+    toast.success("Comment posted!");
+    setSendingComments(false);
+    fetchComments(postId); // Refresh comments
     
+  } catch (error) {
+    console.log(error);
+      toast.error("Failed to send comment")
+    }
+  }
     // Initialize likedIds when data loads
   useEffect(() => {
     if (data) {
@@ -206,25 +288,7 @@
       setPostStates(initialPostStates);
     }
   }, [data]);
-    
-  // Custom hook for fetching comments
-  // const useComments = (postId: string, enabled: boolean) => {
-  //   return useQuery({
-  //     queryKey: ['comments', postId],
-  //     queryFn: async () => {
-  //       const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-  //       const res = await fetch(`${baseUrl}/api/feeds/allfeeds/comments?postId=${postId}&email=${email}`);
-        
-  //       if (!res.ok) {
-  //         throw new Error('Failed to fetch comments');
-  //       }
-        
-  //       return res.json();
-  //     },
-  //     enabled: enabled && !!postId, // Only fetch when enabled
-  //     staleTime: 1000 * 60 * 5, // 5 minutes
-  //   });
-  // }
+  
     // socket for real-time updates
   // useEffect(() => {
   //   socket.on("postLiked", (data) => {
@@ -355,7 +419,6 @@
                     ],
                     ALLOWED_ATTR: ["href", "target"],
                   });
-                  
                 return (
                   <Card className="w-full max-w-[34rem] mx-auto rounded-lg shadow border border-gray-200 bg-white mb-6 pt-2 pb-2" key={post._id}  ref={isLastPost ? ref : null}>
               {/* Someone liked/commented bar */}
@@ -394,12 +457,12 @@
               <CardHeader className="flex flex-row items-center gap-2 px-3 py-1 sm:px-5 sm:py-2">
                 <UserAvatar 
                 avatar={post.avatar}
-                email={post.email} 
+                email={post.email[0].toUpperCase() + post.email.slice(1)} 
                 size={48}
                 className="border-2 border-gray-200"
               />
                 <div className="flex flex-col">
-                  <span className="font-semibold text-gray-900 text-base">{post.email}</span>
+                  <span className="font-semibold text-gray-900 text-base">{post.email[0].toUpperCase() + post.email.slice(1)}</span>
                   <span className="text-xs text-gray-500">{new Date(post.createdAt).toLocaleString()}</span>
                 </div>
               </CardHeader>
@@ -604,10 +667,19 @@
                                   fill={postState.userLiked ? "currentColor" : "none"} />
               {postState.userLiked ? "Liked" : "Like"}
                   </button>
-                  <button className="flex items-center gap-1 hover:text-blue-600 transition w-full sm:w-auto justify-center"  onClick={() => setCommentSection(prev => ({
-                        ...prev,
-                        [post._id]: !prev[post._id]
-                      }))}>
+                  <button className="flex items-center gap-1 hover:text-blue-600 transition w-full sm:w-auto justify-center"  onClick={() => {
+                        const newCommentSectionState = !commentSection[post._id];
+                        setCommentSection(prev => ({
+                          ...prev,
+                          [post._id]: newCommentSectionState
+                        }));
+                        
+                        // If opening comment section and we don't have comments yet, fetch them
+                        if (newCommentSectionState && !commentData[post._id]) {
+                          setLoadingComments(prev => ({ ...prev, [post._id]: true }));
+                          // The useEffect will handle the actual fetching
+                        }
+                      }}>
                     <MessageCircle className="w-5 h-5" /> Comment
                   </button>
                   <div className="relative flex items-center w-full sm:w-auto justify-center">
@@ -634,39 +706,54 @@
           className="w-full h-10 border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
           placeholder="Write a comment..."
           maxLength={200}
+          value={commentText}
+          onChange={(e)=>setCommentText(e.target.value) }
         />
                   {/* Post button */}
-                  <button className="self-end px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                  <button className={`self-end px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm ${sendingComments ? 'disabled':''}`} onClick={()=>handleSubmitComment(post._id) }>
                     Send
                   </button>
                   </div>
 
                   {/* Example comment list */}
                 <div className="w-full space-y-3 mt-2">
-                  {postState.comments.map((comment) => (
-                    <div key={comment._id}>
-                      <div className="flex items-start gap-3">
-                        <UserAvatar 
-                          user={comment.user} 
-                          size={36}
-                          className="border border-gray-300"
-                        />
-                        <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2">
-                          <span className="font-semibold text-sm text-gray-900">
-                            {comment.user.name || comment.user.email}
-                          </span>
-                          <p className="text-gray-800 text-sm mt-0.5">{comment.content}</p>
-                          <div className="flex gap-4 mt-1 text-xs text-gray-500">
-                            <button className="hover:underline">Like</button>
-                            <button className="hover:underline">Reply</button>
-                            <span>{new Date(comment.createdAt).toLocaleString()}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="border-b border-gray-200 my-2" />
-                    </div>
-                  ))}
+                  {sendingComments ? (
+              <div className="absolute top-10 left-0 opacity-15 bg-black h-[100vh] w-[100vh] z-10">Loading comments...
+                <Image src="/video/spinAnimation.gif" alt="spin Animation" width={22} height={22} className="relative m-auto"/>
+              </div>
+            ):(<div></div>)}
+      {loadingComments[post._id] ? (
+        <div className="text-center py-4"><PostsSkeletonComment count={4}/></div>
+      ) : commentData[post._id]?.length > 0 ? (
+        commentData[post._id].map((comment) => (
+          <div key={comment._id}>
+            
+            <div className="flex items-start gap-3">
+              <UserAvatar 
+                avatar={comment.user.avatar}
+                email={comment.user.email}
+                size={36}
+                className="border border-gray-300"
+              />
+              <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2">
+                <span className="font-semibold text-sm text-gray-900">
+                  { comment.user.email[0].toUpperCase() + comment.user.email.slice(1)}
+                </span>
+                <p className="text-gray-800 text-sm mt-0.5">{comment.content}</p>
+                <div className="flex gap-4 mt-1 text-xs text-gray-500">
+                  <button className="hover:underline">Like</button>
+                  <button className="hover:underline">Reply</button>
+                  <span>{new Date(comment.createdAt).toLocaleString()}</span>
                 </div>
+              </div>
+            </div>
+            <div className="border-b border-gray-200 my-2" />
+          </div>
+        ))
+      ) : (
+        <div className="text-center py-4 text-gray-500">No comments yet</div>
+      )}
+    </div>
               </CardFooter>
             )}
             </Card>

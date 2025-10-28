@@ -27,7 +27,7 @@ export async function allfeeds(email, page, limit) {
   const userMap = new Map();
   relevantUsers.forEach(u => {
     userMap.set(u.email, {
-      avatar: u.avatar || u.email.split('@')[0], // Fixed typo: splilt -> split
+      avatar: u.image || u.email.split('@')[0], // Fixed typo: splilt -> split
       name: u.name || u.email.split('@')[0]
     });
   });

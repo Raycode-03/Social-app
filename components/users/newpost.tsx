@@ -1,7 +1,7 @@
 "use client"
   import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
-import { CircleUserRound, File, FileSpreadsheet, Image as Imageicon, Loader2, Smile, Video, X } from "lucide-react"
+import { File, FileSpreadsheet, Image as Imageicon, Loader2, Smile, Video, X } from "lucide-react"
 import Image from "next/image"
 import React, { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -13,7 +13,20 @@ import type { Editor } from '@tiptap/react';
 
   // text editing in textarea
   import PostEditor from "@/users/posteditor"
-    export default function NewPost({ useremail }: { useremail: string  | null}) {
+import { UserAvatar } from "./userAvatar"
+interface NavbarProps {
+    user?: {
+        id: string;
+        name?: string | null;
+        email?: string | null;
+        avatar?: string;
+        isAdmin: boolean;
+        packageType: string;
+    }
+}
+    export default function NewPost({user}: NavbarProps) {
+      const email = user?.email || "";
+      const avatar = user?.avatar || "";
       const ismobile = useIsMobile();
       interface Emoji {
         native: string;
@@ -136,7 +149,7 @@ import type { Editor } from '@tiptap/react';
         // the formdata is safer than the rawfiles
          const formData = new FormData();
           formData.append("text", postData.text);
-          formData.append("email", useremail || "");
+          formData.append("email", email || "");
           rawFiles.images.forEach(file => {
             formData.append("images", file);
           });
@@ -180,7 +193,7 @@ import type { Editor } from '@tiptap/react';
         <Card className="w-full max-w-[34rem] mx-auto p-4 rounded-xl shadow-md transition-all duration-300 hover:shadow-lg" > 
         <div className="flex items-center gap-4">
           {/* User Avatar */}
-          <CircleUserRound className="h-10 w-10 text-gray-500 flex-shrink-0" />
+          <UserAvatar avatar={avatar} email={email} className="h-10 w-10 text-gray-500 flex-shrink-0"/>
 
           {/* The 'Start a post...' button */}
           <button   className="flex-1 px-4 py-2 border border-gray-200 rounded-full bg-gray-50 text-gray-500 text-left transition-colors duration-200
@@ -325,7 +338,6 @@ import type { Editor } from '@tiptap/react';
                
               </div>
 
-
               {/* Actions */}
               <div className="flex gap-2">
                 <Button variant="ghost" className="cursor-pointer hover:bg-gray-200" onClick={()=>{setShowPicker(false); setRawFiles({ images: [] , video: undefined, file: undefined}); setPostData({text: "" , images :[] , video : null, file: null});}}>Clear</Button>
@@ -345,7 +357,5 @@ import type { Editor } from '@tiptap/react';
       )}
       
       </div>
-
-
     )
   }

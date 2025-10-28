@@ -2,7 +2,7 @@
 import Image from "next/image";
 
 interface UserAvatarProps {
-  avatar: string;  // This could be URL or email prefix string
+  avatar?: string;  // This could be URL or email prefix string
   email: string;
   size?: number;
   className?: string;
@@ -10,9 +10,7 @@ interface UserAvatarProps {
 
 export function UserAvatar({ avatar, email, size = 32, className = "" }: UserAvatarProps) {
   // Check if avatar is a URL (starts with http/https)
-  const isImageUrl = avatar.startsWith('http://') || avatar.startsWith('https://');
-
-  if (isImageUrl) {
+  if (avatar && (avatar.startsWith('http://') || avatar.startsWith('https://'))) {
     return (
       <Image
         src={avatar}
@@ -47,12 +45,15 @@ export function UserAvatar({ avatar, email, size = 32, className = "" }: UserAva
     return colors[index];
   };
 
+  // Use email as fallback if avatar is undefined or empty
+  const displayText = avatar || email;
+
   return (
     <div 
-      className={`${getBackgroundColor(avatar)} rounded-full border flex items-center justify-center text-white font-semibold ${className}`}
+      className={`${getBackgroundColor(displayText)} rounded-full border flex items-center justify-center text-white font-semibold ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.4 }}
     >
-      {getInitials(avatar)}
+      {getInitials(displayText)}
     </div>
   );
 }

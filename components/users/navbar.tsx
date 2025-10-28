@@ -1,12 +1,22 @@
 "use client"
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { Bell, CircleUserRound, MessagesSquare, Search, X , LogOut , User} from "lucide-react"
+import { Bell, MessagesSquare, Search, X , LogOut , User} from "lucide-react"
 import Image from 'next/image'
 import { useEffect, useRef, useState } from "react"
 import { signOut } from "next-auth/react"
-
-export default function Navbar() {
+import { UserAvatar } from "./userAvatar"
+interface NavbarProps {
+    user?: {
+        id: string;
+        name?: string | null;
+        email?: string | null;
+        avatar?: string;
+        isAdmin: boolean;
+        packageType: string;
+    }
+}
+export default function Navbar({user}: NavbarProps) {
   const ismobile = useIsMobile()
   const [query, setQuery] = useState("");
   // const [result , setresult] = useState([])
@@ -276,7 +286,14 @@ const handleSignOut = async () => {
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 className="p-2 rounded-full group"
               >
-                <CircleUserRound className="text-gray-500 group-hover:text-gray-800"/>
+                
+                {user?.email && (
+                    <UserAvatar 
+                        avatar={user.avatar} 
+                        email={user.email} 
+                        className="text-gray-500 group-hover:text-gray-800"
+                    />
+                )}
               </button>
 
               {/* Dropdown Menu */}

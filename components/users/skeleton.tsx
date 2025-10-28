@@ -1,7 +1,7 @@
 "use client";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function PostsSkeleton({ count = 3 }: { count?: number }) {
+export function PostsSkeleton({ count = 3 }: { count?: number }) {
   return (
     <div className="space-y-6">
       {Array.from({ length: count }).map((_, index) => (
@@ -101,4 +101,23 @@ export default function PostsSkeleton({ count = 3 }: { count?: number }) {
       ))}
     </div>
   );
+}
+
+export function PostsSkeletonComment ({ count =  4} : {count?:number}){
+  return(
+    <div className="space-y-3">
+      {Array.from({ length: count }).map((_, index) => (
+        <div key={index} className="flex items-start gap-3">
+          <div className="flex">
+            <Skeleton className="h-8 w-8 rounded-full bg-gray-300 left-0" />
+            <div className="right-0 gap-2 flex flex-col">
+              <Skeleton  className="h-4 w-48 bg-gray-300" />
+          <Skeleton className="h-4 w-100 bg-gray-300" />
+            </div>
+          </div>
+          
+          </div>
+      ))}
+    </div>
+  )
 }

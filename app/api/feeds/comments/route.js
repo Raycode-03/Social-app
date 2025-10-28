@@ -1,22 +1,16 @@
-import  {allfeeds}  from "@/backend/services/allfeeds";
+import  {allcomments}  from "@/backend/services/comments";
 import { NextResponse } from "next/server";
 import { auth } from '@/app/api/auth/[...nextauth]/auth'
-export async function GET(req) {
+export async function POST(req) {
   try {
      const session = await auth();
    if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-   const email = session?.user.email;
-  const { searchParams } = new URL(req.url);
-  const page = parseInt(searchParams.get("page")) || 1;
-  const limit = parseInt(searchParams.get("limit")) || 10;
-  // offline work
-  //const { searchParams } = new URL(req.url);
-  
- // const email = searchParams.get("email");
-  const feeds = await allfeeds(email, page, limit);
-  return NextResponse.json(feeds, { status: 200 });
+    const body = await req.json(); // ✅ Parse the request body
+    const { postId } = body;
+    const feeds = await allcomments(postId);
+    return NextResponse.json(feeds, { status: 200 });
   } catch (error) {
     const isDbError = error.message?.includes('MongoNetworkError') || error.message?.includes('ENOTFOUND');
                     console.error("Error registering user:", error);

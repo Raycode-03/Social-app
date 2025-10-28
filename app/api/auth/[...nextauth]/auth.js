@@ -112,6 +112,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
                 token.id = user.id;
                 token.name = user.name;
                 token.email = user.email;
+                token.image = user.image;
                 token.isAdmin = user.isAdmin ?? false;
                 token.packageType = user.packageType ?? "free";
                 token.exp = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // set expiry
@@ -127,6 +128,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
                         token.id = dbUser._id.toString();
                         token.name = dbUser.name;
                         token.email = dbUser.email;
+                        token.avatar = dbUser.avatar?? "";
                         token.isAdmin = dbUser.isAdmin ?? false;
                         token.packageType = dbUser.packageType ?? "free";
                     }
@@ -147,6 +149,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
                 session.user.id = token.id;
                 session.user.name = token.name;
                 session.user.email = token.email;
+                session.user.avatar = token.avatar;
                 session.user.isAdmin = token.isAdmin;
                 session.user.packageType = token.packageType;
             }

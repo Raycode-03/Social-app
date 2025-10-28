@@ -197,8 +197,6 @@ export async function newfeed(data) {
       createdAt: new Date(),
       likes: 0
     });
-
-    console.log('Post created successfully with ID:', result.insertedId);
     return { insertedId: result.insertedId };
 
   } catch (error) {

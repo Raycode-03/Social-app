@@ -6,15 +6,16 @@ import Posts from "@/components/users/posts"
 import Newpost from '@/components/users/newpost'
 async function page() {
     const session = await auth();
-    const email= session?.user.email || null
-    //const email = "akereleolasun7@gmail.com";
-    
+    const user= session?.user;
+    if (!session?.user ) {
+      redirect("/auth/login")
+    }
    if(session?.user){
 
               return(
                 <div className='px-7 py-4'>
-                    <Newpost useremail={email}/>
-                    <Posts email={email} />
+                    <Newpost user={user}/>
+                    <Posts user={user} />
 
                     {/*dont forget to send this to the user account settigns to signout  */}
                     {/* <button className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium shadow-md transition-all duration-200 border border-amber-400 flex items-center gap-2">
