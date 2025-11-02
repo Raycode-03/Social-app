@@ -39,7 +39,7 @@ async function uploadFileToCloudinaryWithRetry(file, folder, resourceType = "ima
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`Upload attempt ${attempt}/${maxRetries} for ${file?.name || 'unknown'} (${resourceType})`);
+      
       
       // Validate file first
       if (!file || !file.type || file.size === 0) {
@@ -62,7 +62,7 @@ async function uploadFileToCloudinaryWithRetry(file, folder, resourceType = "ima
       };
 
       const result = await cloudinary.uploader.upload(dataUri, uploadOptions);
-      console.log(`Upload successful on attempt ${attempt}`);
+      
       return result;
       
     } catch (error) {
@@ -76,7 +76,7 @@ async function uploadFileToCloudinaryWithRetry(file, folder, resourceType = "ima
       
       if (shouldRetry) {
         const backoffTime = 2000 * attempt; // 2s, 4s, 6s
-        console.log(`Retrying in ${backoffTime}ms...`);
+        
         await new Promise(resolve => setTimeout(resolve, backoffTime));
       } else {
         break;
@@ -115,7 +115,7 @@ export async function newfeed(data) {
 
     // Upload images (max 4 as you mentioned)
     if (images.length > 0) {
-      console.log(`Uploading ${images.length} images...`);
+      
       
       for (let i = 0; i < images.length; i++) {
         try {
@@ -143,7 +143,7 @@ export async function newfeed(data) {
     // Upload video (only if no images)
     else if (video) {
       try {
-        console.log('Uploading video file...');
+        
         const result = await uploadFileToCloudinaryWithRetry(
           video, 
           "ray_social/videos", 

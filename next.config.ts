@@ -3,7 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: {
     domains: ["res.cloudinary.com",
-      'lh3.googleusercontent.com', 
+      'lh3.googleusercontent.com',
+      "img.icons8.com",
     ],// allow cloudinary
     // Increase timeout to 30 seconds
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],

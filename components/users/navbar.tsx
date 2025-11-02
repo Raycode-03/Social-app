@@ -69,7 +69,7 @@ export default function Navbar({user}: NavbarProps) {
       const res = await fetch(`${baseUrl}/api/feeds/keywords?query=${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error("Failed to fetch keywords");
       const data = await res.json();
-      console.log("data",data)
+      
       setkeywords(data);
     } catch (err) {
       console.error("Error fetching keywords:", err);
@@ -105,7 +105,6 @@ export default function Navbar({user}: NavbarProps) {
   //     const data = await res.json()
   //     setresult(data)
   //     setshowSearchResults(true);
-  //     console.log(data)
   // } catch (err) {
   //     if (err.name === "AbortError") {
   //       console.log("Search aborted:", query); // harmless
@@ -179,7 +178,7 @@ export default function Navbar({user}: NavbarProps) {
 );
 const handleSignOut = async () => {
   try {
-    console.log("🧹 Starting nuclear cleanup...");
+    
     
     // 1. Clear ALL cookies
     const cookies = document.cookie.split(";");
@@ -197,7 +196,7 @@ const handleSignOut = async () => {
     localStorage.clear();
     sessionStorage.clear();
 
-    console.log("✅ Cleanup complete, now signing out...");
+    
 
     // 3. Now do the proper signOut
     await signOut({ 

@@ -38,7 +38,7 @@ export async function newcomment(data) {
         // get user
         const user = await db.collection('users').findOne({ email });
         if (!user) {
-            return { error: 'User not found' };
+            return  'User not found';
         }
        const userId = user._id;
         // create comment document
@@ -49,9 +49,21 @@ export async function newcomment(data) {
             likes: 0,
             createdAt: new Date()
         };
-        await db.collection("posts").updateOne({_id : new ObjectId(postId)} , {$inc:{comments: 1}})
         const result = await db.collection('comments').insertOne(commentDoc);
-        return { success: true, commentId: result.insertedId };
+        await db.collection("posts").updateOne({_id : new ObjectId(postId)} , {$inc:{comments: 1}})
+        return{
+          _id: result.insertedId,
+          postId,
+          content,
+          createdAt: commentDoc.createdAt,
+          likes: 0,
+          userLiked: false,
+          user: {
+            email: user.email,
+            name: user.name || user.email.split('@')[0],
+            avatar: user.image
+          }
+        };
     } catch (error) {
         console.error("Error adding comment:", error);
         return { error: 'Failed to add comment' };
@@ -60,12 +72,11 @@ export async function newcomment(data) {
 export async function  likecomment(commentId , liked , email){
   await connect_db(); 
   const db = get_db();
-  console.log(liked)
+  try {
   const incValue = liked ? 1 : -1;
+  const comment_doc = await db.collection("comments").findOne({ _id : new ObjectId(commentId) });
+  if(!comment_doc) return "Comment not found";
   
-  const posts_doc = await db.collection("posts").findOne({ _id : new ObjectId(commentId) });
-  if(!posts_doc) return {error:"Comment not found"};
-  console.log(incValue, " incValue")
      await db.collection("comments").updateOne(
     { _id: new ObjectId(commentId) },
     { $inc: { likes: incValue } }  // usually pass like = 1 to add a like
@@ -86,7 +97,10 @@ export async function  likecomment(commentId , liked , email){
     });
   }
   //  then get the total likes to show to the users 
-  const totalLikes = posts_doc.comments || 0
+  const totalLikes = comment_doc.comments || 0
   
   return { totalLikes };
+  } catch (error) {
+    console.error("Error updating like:", error);
+  }
 }

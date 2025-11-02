@@ -148,12 +148,10 @@ export async function allfeeds(email, page, limit) {
 export async function  likepost(postId , liked , email){
   await connect_db(); 
   const db = get_db();
-  console.log(liked)
   const incValue = liked ? 1 : -1;
   
   const posts_doc = await db.collection("posts").findOne({ _id : new ObjectId(postId) });
   if(!posts_doc) return {error:"Post not found"};
-  console.log(incValue, " incValue")
     await db.collection("posts").updateOne(
     { _id: new ObjectId(postId) },
     { $inc: { likes: incValue } }  // usually pass like = 1 to add a like

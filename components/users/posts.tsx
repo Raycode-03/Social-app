@@ -166,6 +166,9 @@ interface NavbarProps {
       } = useInfiniteQuery({
         queryKey: ['posts', email],
         queryFn: async ({ pageParam = 1 }) => {
+          try {
+            
+         
         const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
         const res = await fetch(`${baseUrl}/api/feeds/allfeeds?email=${email}&page=${pageParam}&limit=5`);
         
@@ -181,21 +184,32 @@ interface NavbarProps {
         }
         
         return res.json();
+         } catch (err) {
+            console.log(err);
+            toast.error('Network error. Trying again...');
+            throw err; // important for React Query to handle retries
+          }
       },
+      
       initialPageParam: 1,
       getNextPageParam: (lastPage: PostsResponse) => {
         return lastPage.hasMore ? lastPage.currentPage + 1 : undefined;
       },
       enabled: !!email,
+      staleTime: 1000 * 60 * 2, // ✅ cache for 2 minutes
+      refetchOnWindowFocus: false,
     });
 
     // Simple intersection observer
     const { ref, inView } = useInView();
     useEffect(() => {
-      if (inView && hasNextPage) {
-        fetchNextPage();
+      if (inView && hasNextPage && !isFetchingNextPage ) {
+        fetchNextPage().catch((err) => {
+          console.error('Pagination fetch failed:', err);
+          toast.error('Could not load more posts. Check your connection.');
+    });
       }
-    }, [inView, hasNextPage, fetchNextPage]);
+    }, [inView, hasNextPage, fetchNextPage , isFetchingNextPage]);
     // Custom hook for fetching comments
    const fetchComments = async (postId: string) => {
   setLoadingComments(prev => ({ ...prev, [postId]: true }));
@@ -207,7 +221,6 @@ interface NavbarProps {
       body: JSON.stringify({ postId }),     
     });
     const data = await res.json();
-    console.log(data, "data for the comments");
     
     if (!res.ok) {
       toast.error(data.error || "Unable to fetch comments");
@@ -219,7 +232,7 @@ interface NavbarProps {
       [postId]: data || []
     }));
     
-    // 🟨 Initialize like state per comment
+    // Initialize like state per comment
     const newCommentLikes: Record<string, boolean> = {};
     const newCommentLikeCounts: Record<string, number> = {};
 
@@ -253,9 +266,8 @@ useEffect(() => {
     toast.error("Comment cannot be empty");
     return;
   }
-
   setSendingComments(true);
-    // 🟩 Step 1: Create a temporary comment for optimistic UI
+    // Create a temporary comment for optimistic UI
     const tempId = 'temp-' + Date.now();
     const newComment: Comment = {
     _id: tempId,
@@ -266,12 +278,17 @@ useEffect(() => {
     createdAt: new Date().toISOString(),
     likes: 0,
     userLiked: false,
-  } as Comment; // ✅ explicitly tell TypeScript it’s a Comment
+    user:{
+      email: email,
+      name: email.split('@')[0],
+      avatar: '',
+    }
+  } as Comment; // tell TypeScript it’s a Comment
 
-  // 🟩 Step 2: Optimistically add the new comment to the UI
+  // Optimistically add the new comment to the UI
    setCommentData(prev => ({
     ...prev,
-    [postId]: [...(prev[postId] || []), newComment],
+    [postId]: [ newComment , ...(prev[postId] || [])],
   }));
 
 
@@ -289,18 +306,16 @@ useEffect(() => {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ content: commentText, postId: postId, email })
     });
-    console.log(postId, email, commentText, "comment data");
     const data = await res.json();
-    
     if (!res.ok) {
       toast.error(data.error || "Failed to send comment");
       return;
     }
     toast.success("Comment posted!");
-    // 🟩 Step 4: Replace temporary comment with real one from server
+    // Replace temporary comment with real one from server
      setCommentData(prev => ({
       ...prev,
-      [postId]: prev[postId].map(c => (c._id === tempId ? data.comment : c)),
+      [postId]: prev[postId].map(c => (c._id === tempId ? data : c)),
     }));
     toast.success('Comment posted!');
   } catch (error) {
@@ -355,7 +370,6 @@ useEffect(() => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({commentId:commentId, liked: newLiked , email:email}),
     });
-
     if (!res.ok) toast.error('failed to update comment like');
   } catch (error) {
     console.error(error);
@@ -376,7 +390,6 @@ useEffect(() => {
   // useEffect(() => {
   //   socket.on("postLiked", (data) => {
   //     // Update the local state or refetch data as needed
-  //     console.log("Post liked:", data);
   //   });
   //   return () => {
   //     socket.disconnect();
@@ -805,12 +818,12 @@ useEffect(() => {
         <div className="text-center py-4"><PostsSkeletonComment count={4}/></div>
       ) : commentData[post._id]?.length > 0 ? (
         commentData[post._id].map((comment) => (
+          
           <div key={comment._id}>
-            
             <div className="flex items-start gap-3">
               <UserAvatar 
-                avatar={comment.user.avatar}
-                email={comment.user.email}
+                avatar={comment?.user?.avatar || "https://img.icons8.com/ios-filled/50/user-male-circle.png"}
+                email={comment?.user?.email|| ""}
                 size={36}
                 className="border border-gray-300"
               />
@@ -821,9 +834,11 @@ useEffect(() => {
                 </span>
                 <p className="text-gray-800 text-sm mt-0.5">{comment.content}</p>
                 <div className="flex gap-4 mt-1 text-xs text-gray-500">
-                  <button className={`hover:text-blue-600 ${commentLikes[comment._id] ? 'text-blue-600' : ''}`} onClick={handlelikepercomment(comment._id)}disabled={sendingComments}>
-                    {commentLikes[comment._id] ? `Liked ${commentLikeCounts[comment._id] ?? comment.likes} ${commentLikeCounts[comment._id] === 1 ? 'Like' : 'Likes'}` : 'Like'}</button>
-                  <button className="hover:underline">Reply</button>
+                  <button className={`hover:text-blue-600 ${commentLikes[comment._id] ? 'text-blue-600' : ''} flex`} onClick={handlelikepercomment(comment._id)}disabled={sendingComments}>
+                  <Heart className={`w-4 h-4 mr-1 ${commentLikes[comment._id]} ? 'block text-blue-600': 'hidden' `} fill={commentLikes[comment._id] ? "currentColor" : "none"} />
+                  {/* make work on this  */}
+                    {commentLikes[comment._id] ? `${commentLikeCounts[comment._id] ?? comment.likes} ${commentLikeCounts[comment._id] === 1 ? 'Like' : 'Likes'}`:''}</button>
+                  <button className="hover:text-blue-600">Reply</button>
                 </div>
               </div>
             </div>
