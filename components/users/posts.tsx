@@ -6,6 +6,7 @@
   import { useRef } from "react"
   import {Card,CardContent,CardFooter,CardHeader} from "@/components/ui/card"
   import DOMPurify from "dompurify"
+  import { formatDistanceToNow } from 'date-fns';
   import { Eye, Heart, MessageCircle, Share , Pause, Play , File} from "lucide-react"
   import { useInView } from 'react-intersection-observer'
   import { useInfiniteQuery } from '@tanstack/react-query'
@@ -33,7 +34,7 @@
     images: mediaItem [];
     video: mediaItem | null;
     userLiked: boolean;
-    commentCount: number; 
+    comments: number; 
     likedByFriends: User[];
   }
   interface PostsResponse {
@@ -72,7 +73,8 @@ interface NavbarProps {
     const [sendingComments, setSendingComments] = useState(false);
     const [commentData, setCommentData] = useState<Record<string, Comment[]>>({});
     const [commentText , setCommentText] = useState("");
-    // const [commentInputs , setCommentInputs] = useState<Record<string, string>>({});
+    const [commentLikes , setCommentLikes] = useState<Record<string, boolean>>({});
+    const [commentLikeCounts, setCommentLikeCounts] = useState<Record<string, number>>({});
     const [copied, setCopied] = useState(false);
     const [feeds, setFeeds] = useState<FeedPost[]>([]);
     const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -81,9 +83,7 @@ interface NavbarProps {
         likes: number; 
         userLiked: boolean;
         isUpdating: boolean;
-        comments: Comment[];
-        isAddingComment: boolean;
-        commentCount: number; // Store count from post fetch
+        comments : number;
       }>>({});
     // for video play/pause
     const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
@@ -218,6 +218,18 @@ interface NavbarProps {
       ...prev,
       [postId]: data || []
     }));
+    
+    // 🟨 Initialize like state per comment
+    const newCommentLikes: Record<string, boolean> = {};
+    const newCommentLikeCounts: Record<string, number> = {};
+
+    (data || []).forEach((comment: any) => {
+      newCommentLikes[comment._id] = comment.userLiked || false;
+      newCommentLikeCounts[comment._id] = comment.likes || 0;
+    });
+
+    setCommentLikes(prev => ({ ...prev, ...newCommentLikes }));
+    setCommentLikeCounts(prev => ({ ...prev, ...newCommentLikeCounts }));
   } catch (err) {
     toast.error("Failed to fetch comments");
     console.log(err);
@@ -237,11 +249,39 @@ useEffect(() => {
 
   // send a comment
   const handleSubmitComment = async(postId: string) =>{
-    setSendingComments(true);
    if (!commentText.trim()) {
     toast.error("Comment cannot be empty");
     return;
   }
+
+  setSendingComments(true);
+    // 🟩 Step 1: Create a temporary comment for optimistic UI
+    const tempId = 'temp-' + Date.now();
+    const newComment: Comment = {
+    _id: tempId,
+    postId,
+    isOpen: false,
+    content: commentText,
+    email,
+    createdAt: new Date().toISOString(),
+    likes: 0,
+    userLiked: false,
+  } as Comment; // ✅ explicitly tell TypeScript it’s a Comment
+
+  // 🟩 Step 2: Optimistically add the new comment to the UI
+   setCommentData(prev => ({
+    ...prev,
+    [postId]: [...(prev[postId] || []), newComment],
+  }));
+
+
+  // Optionally initialize like states for the new comment
+  setCommentLikes(prev => ({ ...prev, [tempId]: false }));
+  setCommentLikeCounts(prev => ({ ...prev, [tempId]: 0 }));
+
+  // Clear input immediately for better UX
+  setCommentText('');
+
   
   try {
     const res = await fetch(`/api/feeds/newcomment`, {
@@ -256,15 +296,23 @@ useEffect(() => {
       toast.error(data.error || "Failed to send comment");
       return;
     }
-    // Success
-    setCommentText(''); // Clear the input
     toast.success("Comment posted!");
-    setSendingComments(false);
-    fetchComments(postId); // Refresh comments
-    
+    // 🟩 Step 4: Replace temporary comment with real one from server
+     setCommentData(prev => ({
+      ...prev,
+      [postId]: prev[postId].map(c => (c._id === tempId ? data.comment : c)),
+    }));
+    toast.success('Comment posted!');
   } catch (error) {
-    console.log(error);
+      console.log(error);
       toast.error("Failed to send comment")
+      setCommentData(prev => ({
+        ...prev,
+        [postId]: prev[postId].filter(c => c._id !== tempId),
+      }));
+    }
+    finally{
+      setSendingComments(false);
     }
   }
     // Initialize likedIds when data loads
@@ -274,21 +322,56 @@ useEffect(() => {
       setFeeds(allPosts);
         
        // Initialize post states from server data
-      const initialPostStates: Record<string, { likes: number; userLiked: boolean; isUpdating: boolean, comments: Comment[];isAddingComment: boolean; commentCount: number; }> = {};
+      const initialPostStates: Record<string, { likes: number; userLiked: boolean; isUpdating: boolean , comments : number }> = {};
       allPosts.forEach(post => {
         initialPostStates[post._id] = {
           likes: post.likes,
           userLiked: post.userLiked,
           isUpdating: false,
-          comments: [], // Start with empty comments
-          isAddingComment: false,
-          commentCount: post.commentCount || 0
+          comments : post.comments,
+          
+
         };
       });
       setPostStates(initialPostStates);
     }
   }, [data]);
-  
+  const  handlelikepercomment = (commentId : string) => async () => {
+    const currentlyLiked = commentLikes[commentId];
+    const newLiked = !currentlyLiked;
+    // Step 1: Optimistic update
+    setCommentLikeCounts(prev => ({
+      ...prev,
+      [commentId]: prev[commentId] + (newLiked ? 1 : -1),
+    }));
+    setCommentLikes(prev => ({
+      ...prev,
+      [commentId]: newLiked,
+    }));
+    try {
+    // Step 2: Send update to backend
+    const res = await fetch(`/api/feeds/likecomment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({commentId:commentId, liked: newLiked , email:email}),
+    });
+
+    if (!res.ok) toast.error('failed to update comment like');
+  } catch (error) {
+    console.error(error);
+    // Step 3: Revert if failed
+    toast.error('failed to update comment like');
+    setCommentLikes(prev => ({
+      ...prev,
+      [commentId]: currentlyLiked,
+    }));
+    setCommentLikeCounts(prev => ({
+      ...prev,
+      [commentId]: prev[commentId] + (currentlyLiked ? 1 : -1),
+    }));
+  }
+      // Here you can also send the like status to the server if needed
+  }
     // socket for real-time updates
   // useEffect(() => {
   //   socket.on("postLiked", (data) => {
@@ -319,9 +402,7 @@ useEffect(() => {
         likes: currentlyLiked ? currentLikes - 1 : currentLikes + 1,
         userLiked: !currentlyLiked,
         isUpdating: true,
-        comments: currentState.comments, // explicitly include
-      isAddingComment: currentState.isAddingComment, // explicitly include
-      commentCount: currentState.commentCount // explicitly include
+        comments: currentState.comments
       }
     }));
       
@@ -343,9 +424,7 @@ useEffect(() => {
           likes: data.likes ?? (currentlyLiked ? currentLikes - 1 : currentLikes + 1),
           userLiked: data.userLiked ?? !currentlyLiked,
           isUpdating: false,
-          comments: currentState.comments, // explicitly include
-      isAddingComment: currentState.isAddingComment, // explicitly include
-      commentCount: currentState.commentCount // explicitly include
+          comments : currentState.comments
         }
       }));
     } catch (error) { 
@@ -396,9 +475,7 @@ useEffect(() => {
                     likes: post.likes, 
                     userLiked: post.userLiked, 
                     isUpdating: false,
-                    comments: [],
-                    isAddingComment: false,
-                    commentCount: post.commentCount 
+                    comments: post.comments,
                 };
                 const isLastPost = index ===feeds.length - 1;
                 const fullText = post.content || "";
@@ -420,37 +497,37 @@ useEffect(() => {
                     ALLOWED_ATTR: ["href", "target"],
                   });
                 return (
-                  <Card className="w-full max-w-[34rem] mx-auto rounded-lg shadow border border-gray-200 bg-white mb-6 pt-2 pb-2" key={post._id}  ref={isLastPost ? ref : null}>
-              {/* Someone liked/commented bar */}
-              {post.likedByFriends.length > 0 && (
-                <>
-              <div className="w-full flex items-center flex-row gap-2 text-gray-500 text-sm py-2 px-3 sm:px-5 border-b border-gray-200">
-               {/* For single like */}
-              {post.likedByFriends.length === 1 && (
-                  <div className="flex items-center gap-2">
-                    <UserAvatar avatar={post.likedByFriends[0].avatar} email={post.likedByFriends[0].email} size={43} className=""/>
-                    <span className="font-bold">{post.likedByFriends[0].name} liked this</span>
-                  </div>
-                )}
-
-               {/* For multiple likes - show first 2-3 avatars */}
-                {post.likedByFriends.length > 1 && (
-                  <div className="flex items-center gap-2">
-                    <div className="flex -space-x-2">
-                      {post.likedByFriends.slice(0, 3).map((friend) => (
-                        <UserAvatar 
-                          key={friend.email}
-                          avatar={friend.avatar} 
-                          email={friend.email} 
-                          size={35}
-                          className="border-2 border-white"
-                        />
-                      ))}
+                    <Card className="w-full max-w-[34rem] mx-auto rounded-lg shadow border border-gray-200 bg-white mb-6 pt-2 pb-2" key={post._id}  ref={isLastPost ? ref : null}>
+                {/* Someone liked/commented bar */}
+                {post.likedByFriends.length > 0 && (
+                  <>
+                <div className="w-full flex items-center flex-row gap-2 text-gray-500 text-sm py-2 px-3 sm:px-5 border-b border-gray-200">
+                {/* For single like */}
+                {post.likedByFriends.length === 1 && (
+                    <div className="flex items-center gap-2">
+                      <UserAvatar avatar={post.likedByFriends[0].avatar} email={post.likedByFriends[0].email} size={43} className=""/>
+                      <span className="font-bold">{post.likedByFriends[0].name} liked this</span>
                     </div>
-                   <span className="font-bold"> {post.likedByFriends[0].name} and {post.likedByFriends.length - 1} others liked this</span>
-                  </div>
-                )}
-              </div>
+                  )}
+
+                {/* For multiple likes - show first 2-3 avatars */}
+                  {post.likedByFriends.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex -space-x-2">
+                        {post.likedByFriends.slice(0, 3).map((friend) => (
+                          <UserAvatar 
+                            key={friend.email}
+                            avatar={friend.avatar} 
+                            email={friend.email} 
+                            size={35}
+                            className="border-2 border-white"
+                          />
+                        ))}
+                      </div>
+                    <span className="font-bold"> {post.likedByFriends[0].name} and {post.likedByFriends.length - 1} others liked this</span>
+                    </div>
+                  )}
+                </div>
               </>
               )}
 
@@ -463,7 +540,7 @@ useEffect(() => {
               />
                 <div className="flex flex-col">
                   <span className="font-semibold text-gray-900 text-base">{post.email[0].toUpperCase() + post.email.slice(1)}</span>
-                  <span className="text-xs text-gray-500">{new Date(post.createdAt).toLocaleString()}</span>
+                  <span className="text-xs text-gray-500">{formatDistanceToNow( new Date(post.createdAt))} ago</span>
                 </div>
               </CardHeader>
 
@@ -486,8 +563,9 @@ useEffect(() => {
                     </button>
                   )}
                 </div>
-
-                <div className={`rounded-lg overflow-hidden ${post.images.length>1 ? "border border-gray-100" : ""} mb-2 p-2 px-4`}>
+              </CardContent>
+              <CardContent className=" px-0 rounded-none">
+                <div className={`rounded-none overflow-hidden mb-2 p-0 px-0`}>
               {/* Images */}
               {post.images && post.images.length > 0 && (
                 <div className="mt-2">
@@ -495,7 +573,7 @@ useEffect(() => {
                     <Image 
                       src={post.images[0].url} 
                       alt="Post media" 
-                      className="rounded-lg w-full object-cover cursor-zoom-in" 
+                      className="w-full object-cover cursor-zoom-in" 
                       width={600} 
                       height={400}
                       onClick={() => setZoomedImage(post.images[0].url)}
@@ -510,7 +588,7 @@ useEffect(() => {
                           key={i} 
                           src={img.url} 
                           alt="Post media" 
-                          className="rounded-lg object-cover cursor-zoom-in" 
+                          className=" object-cover cursor-zoom-in" 
                           width={600} 
                           height={400}
                           onClick={() => setZoomedImage(img.url)}
@@ -581,13 +659,13 @@ useEffect(() => {
 
               {/* Video */}
               {post.video && (
-                <div className="relative mt-2 rounded-lg overflow-hidden"  
+                <div className="relative mt-2 overflow-hidden"  
                       onMouseEnter={() => handleMouseEnter(post._id)}
                     onMouseLeave={() => handleMouseLeave(post._id)}
                     >
                   <video
                     ref={setVideoRef(post._id)}
-                    className="w-full rounded-lg"
+                    className="w-full"
                     src={post.video.url}
                     onClick={() => handleToggle(post._id)}
                     onEnded={() => handleVideoEnd(post._id)}
@@ -617,7 +695,7 @@ useEffect(() => {
                   
                   className="block mt-2"
                 >
-                  <div className="flex flex-col items-center justify-center h-32 bg-gray-100 rounded-lg border border-gray-200"> {/* ← Added bg and border */}
+                  <div className="flex flex-col items-center justify-center h-32 bg-gray-100 border border-gray-200"> {/* ← Added bg and border */}
                     <File className="text-3xl mb-2" strokeWidth={2} />
                     <span className="text-xs text-center truncate px-2">{post.file.name || "file"}</span>          
                   </div>          
@@ -650,15 +728,16 @@ useEffect(() => {
                 </div>
               )}
             </div>
-
+            </CardContent>
+            <CardContent className="px-3 py-2 sm:px-5 sm:py-3">
                 <div className="flex sm:flex-row justify-between items-start sm:items-center gap-2 text-gray-500 text-sm mb-1">
                   <span className="flex gap-1 items-center">
                     <Eye className="w-4 h-4" />
                     <span>46</span>
                   </span>
-                  <span>{postState.likes } Likes / (22) comments</span>
+                  <span>{postState.likes } Likes / {postState.comments} comments</span>
                 </div>
-
+              
                 <div className="border-t border-gray-200 my-1" />
 
                 <div className="flex sm:flex-row justify-between items-stretch sm:items-center text-gray-600 font-medium text-sm gap-2 mt-4">
@@ -705,7 +784,7 @@ useEffect(() => {
                   <textarea
           className="w-full h-10 border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
           placeholder="Write a comment..."
-          maxLength={200}
+          maxLength={600}
           value={commentText}
           onChange={(e)=>setCommentText(e.target.value) }
         />
@@ -736,18 +815,19 @@ useEffect(() => {
                 className="border border-gray-300"
               />
               <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2">
-                <span className="font-semibold text-sm text-gray-900">
+                <span className="font-semibold text-sm text-gray-900 flex gap-4">
                   { comment.user.email[0].toUpperCase() + comment.user.email.slice(1)}
+                  <span className="font-normal text-sm text-gray-500">{formatDistanceToNow( new Date(comment.createdAt) )} ago</span>
                 </span>
                 <p className="text-gray-800 text-sm mt-0.5">{comment.content}</p>
                 <div className="flex gap-4 mt-1 text-xs text-gray-500">
-                  <button className="hover:underline">Like</button>
+                  <button className={`hover:text-blue-600 ${commentLikes[comment._id] ? 'text-blue-600' : ''}`} onClick={handlelikepercomment(comment._id)}disabled={sendingComments}>
+                    {commentLikes[comment._id] ? `Liked ${commentLikeCounts[comment._id] ?? comment.likes} ${commentLikeCounts[comment._id] === 1 ? 'Like' : 'Likes'}` : 'Like'}</button>
                   <button className="hover:underline">Reply</button>
-                  <span>{new Date(comment.createdAt).toLocaleString()}</span>
                 </div>
               </div>
             </div>
-            <div className="border-b border-gray-200 my-2" />
+          
           </div>
         ))
       ) : (

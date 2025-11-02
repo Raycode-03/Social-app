@@ -4,8 +4,8 @@ export function newcommentvalidate(data) {
     if (!content || typeof content !== 'string' || content.trim().length === 0) {
         return 'Content cannot be empty.';
     }
-    if(content.length > 200) {
-        return 'Content cannot exceed 200 characters.';
+    if(content.length > 600) {
+        return 'Content cannot exceed 600 characters.';
     }
     if (!postId || typeof postId !== 'string' || !validator.isMongoId(postId)) {
         return 'A valid postId is required.';

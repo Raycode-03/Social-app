@@ -49,10 +49,44 @@ export async function newcomment(data) {
             likes: 0,
             createdAt: new Date()
         };
+        await db.collection("posts").updateOne({_id : new ObjectId(postId)} , {$inc:{comments: 1}})
         const result = await db.collection('comments').insertOne(commentDoc);
         return { success: true, commentId: result.insertedId };
     } catch (error) {
         console.error("Error adding comment:", error);
         return { error: 'Failed to add comment' };
     }
+}
+export async function  likecomment(commentId , liked , email){
+  await connect_db(); 
+  const db = get_db();
+  console.log(liked)
+  const incValue = liked ? 1 : -1;
+  
+  const posts_doc = await db.collection("posts").findOne({ _id : new ObjectId(commentId) });
+  if(!posts_doc) return {error:"Comment not found"};
+  console.log(incValue, " incValue")
+     await db.collection("comments").updateOne(
+    { _id: new ObjectId(commentId) },
+    { $inc: { likes: incValue } }  // usually pass like = 1 to add a like
+    
+  );
+  // Optional: keep a record of who liked it
+  if (liked) {
+    await db.collection("comment_likes").insertOne({
+      commentId: new ObjectId(commentId),
+      email,
+      createdAt: new Date(),
+    });
+  } else {
+    // if unliking, optionally remove their like record
+    await db.collection("comment_likes").deleteOne({
+      commentId: new ObjectId(commentId),
+      email
+    });
+  }
+  //  then get the total likes to show to the users 
+  const totalLikes = posts_doc.comments || 0
+  
+  return { totalLikes };
 }

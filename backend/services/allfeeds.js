@@ -154,7 +154,7 @@ export async function  likepost(postId , liked , email){
   const posts_doc = await db.collection("posts").findOne({ _id : new ObjectId(postId) });
   if(!posts_doc) return {error:"Post not found"};
   console.log(incValue, " incValue")
-    const updateResult = await db.collection("posts").updateOne(
+    await db.collection("posts").updateOne(
     { _id: new ObjectId(postId) },
     { $inc: { likes: incValue } }  // usually pass like = 1 to add a like
     

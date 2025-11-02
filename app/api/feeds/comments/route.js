@@ -13,7 +13,7 @@ export async function POST(req) {
     return NextResponse.json(feeds, { status: 200 });
   } catch (error) {
     const isDbError = error.message?.includes('MongoNetworkError') || error.message?.includes('ENOTFOUND');
-                    console.error("Error registering user:", error);
+                    console.error("Error commenting post:", error);
                     return NextResponse.json({ error: isDbError ? "Network unavailable" : "Internal server error" }, {status: 500});
   }
   
