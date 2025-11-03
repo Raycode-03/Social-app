@@ -270,12 +270,16 @@ const handleSignOut = async () => {
           <div className="flex items-center gap-4">
           <button className="p-2 rounded-full  flex flex-col items-center group">
             <Bell className="text-center text-gray-500 group-hover:text-gray-800" />
-            <span className="text-[0.7rem] text-gray-400 group-hover:text-gray-800">Notification</span>
+            {!ismobile && (
+              <span className="text-[0.7rem] text-gray-400 group-hover:text-gray-800">Notification</span>
+            )}
         </button>
 
           <button className="p-2 rounded-full flex flex-col items-center group">
             <MessagesSquare className="text-center text-gray-500 group-hover:text-gray-800" />
-            <span className="text-[0.7rem] text-gray-400 group-hover:text-gray-800">Messages</span>
+            {!ismobile && (
+              <span className="text-[0.7rem] text-gray-400 group-hover:text-gray-800">Messages</span>
+            )}
           </button>
           
 

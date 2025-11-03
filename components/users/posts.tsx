@@ -544,21 +544,20 @@ useEffect(() => {
               </>
               )}
 
-              <CardHeader className="flex flex-row items-center gap-2 px-3 py-1 sm:px-5 sm:py-2">
+              <CardHeader className="flex flex-row items-center gap-2 px-3 py-1 sm:px-5 sm:py-2 !pb-2">
                 <UserAvatar 
                 avatar={post.avatar}
                 email={post.email[0].toUpperCase() + post.email.slice(1)} 
-                size={48}
-                className="border-2 border-gray-200"
+                size={42}
+                className="border-2 border-gray-200 w-12 h-12 max-[420px]:w-8 max-[420px]:h-8  max-[325px]:w-7 max-[325px]:h-7"
               />
-                <div className="flex flex-col">
-                  <span className="font-semibold text-gray-900 text-base">{post.email[0].toUpperCase() + post.email.slice(1)}</span>
-                  <span className="text-xs text-gray-500">{formatDistanceToNow( new Date(post.createdAt))} ago</span>
+                <div className="flex flex-col ">
+                  <span className="font-semibold text-gray-900 text-base max-[450px]:text-[13px]  max-[375px]:text-[12px] max-[325px]:text-[11px]">{post.email[0].toUpperCase() + post.email.slice(1)}</span>
+                  <span className="text-xs text-gray-500 max-[375px]:text-[11px]">{formatDistanceToNow( new Date(post.createdAt))} ago</span>
                 </div>
               </CardHeader>
-
               <CardContent className="px-3 py-2 sm:px-5 sm:py-3">
-                <div className="text-gray-900 text-[15px] leading-relaxed mb-2 break-words" 
+                <div className="text-gray-900 text-[15px] leading-relaxed mb-2 break-words max-[450px]:text-[13px]" 
                   dangerouslySetInnerHTML={{ __html: clean }}
                 />
                   <div>
@@ -581,7 +580,7 @@ useEffect(() => {
                 <div className={`rounded-none overflow-hidden mb-2 p-0 px-0`}>
               {/* Images */}
               {post.images && post.images.length > 0 && (
-                <div className="mt-2">
+                <div className="mt-0">
                   {post.images.length === 1 && (
                     <Image 
                       src={post.images[0].url} 
@@ -672,7 +671,7 @@ useEffect(() => {
 
               {/* Video */}
               {post.video && (
-                <div className="relative mt-2 overflow-hidden"  
+                <div className="relative mt-0 overflow-hidden"  
                       onMouseEnter={() => handleMouseEnter(post._id)}
                     onMouseLeave={() => handleMouseLeave(post._id)}
                     >
@@ -706,7 +705,7 @@ useEffect(() => {
                         handleDownload(post?.file);
                   }}
                   
-                  className="block mt-2"
+                  className="block mt-0"
                 >
                   <div className="flex flex-col items-center justify-center h-32 bg-gray-100 border border-gray-200"> {/* ← Added bg and border */}
                     <File className="text-3xl mb-2" strokeWidth={2} />
@@ -820,20 +819,20 @@ useEffect(() => {
         commentData[post._id].map((comment) => (
           
           <div key={comment._id}>
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 max-[450px]:gap-2">
               <UserAvatar 
                 avatar={comment?.user?.avatar || "https://img.icons8.com/ios-filled/50/user-male-circle.png"}
                 email={comment?.user?.email|| ""}
                 size={36}
-                className="border border-gray-300"
+                className="border border-gray-300  w-9 h-9 max-[450px]:w-8 max-[450px]:h-8 max-[380px]:w-6 max-[380px]:h-6"
               />
-              <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2">
-                <span className="font-semibold text-sm text-gray-900 flex gap-4">
+              <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2 max-[450px]:px-2 max-[450px]:py-1.5 max-[380px]:w-full">
+                <span className="font-semibold text-sm text-gray-900 flex gap-2 max-[450px]:text-[13px] max-[380px]:text-[11px] max-[350px]:text-[8px]">
                   { comment.user.email[0].toUpperCase() + comment.user.email.slice(1)}
-                  <span className="font-normal text-sm text-gray-500">{formatDistanceToNow( new Date(comment.createdAt) )} ago</span>
+                  <span className="font-normal text-sm text-gray-500 max-[450px]:text-[10px] max-[380px]:text-[8px] max-[350px]:text-[7px]">{formatDistanceToNow( new Date(comment.createdAt) )} ago</span>
                 </span>
-                <p className="text-gray-800 text-sm mt-0.5">{comment.content}</p>
-                <div className="flex gap-4 mt-1 text-xs text-gray-500">
+                <p className="text-gray-800 text-sm mt-0.5 max-[380px]:text-[12px] break-words max-[350px]:text-[9px]">{comment.content}</p>
+                <div className="flex gap-4 mt-1 text-xs text-gray-500 max-[450px]:gap-3 max-[450px]:text-[11px] max-[380px]:text-[9px]">
                   <button className={`hover:text-blue-600 ${commentLikes[comment._id] ? 'text-blue-600' : ''} flex`} onClick={handlelikepercomment(comment._id)}disabled={sendingComments}>
                   <Heart className={`w-4 h-4 mr-1 ${commentLikes[comment._id]} ? 'block text-blue-600': 'hidden' `} fill={commentLikes[comment._id] ? "currentColor" : "none"} />
                   {/* make work on this  */}

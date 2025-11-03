@@ -7,9 +7,10 @@ export async function POST(req) {
    if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userEmail = session?.user?.email
     const body = await req.json(); // ✅ Parse the request body
     const { postId } = body;
-    const feeds = await allcomments(postId);
+    const feeds = await allcomments(postId , userEmail);
     return NextResponse.json(feeds, { status: 200 });
   } catch (error) {
     const isDbError = error.message?.includes('MongoNetworkError') || error.message?.includes('ENOTFOUND');

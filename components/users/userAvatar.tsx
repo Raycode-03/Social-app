@@ -15,9 +15,9 @@ export function UserAvatar({ avatar, email, size = 32, className = "" }: UserAva
       <Image
         src={avatar}
         alt={`${email}'s avatar`}
-        width={size}
-        height={size}
+        width={size} height= {size}
         className={`rounded-full border object-cover ${className}`}
+
       />
     );
   }

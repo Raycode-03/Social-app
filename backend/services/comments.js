@@ -1,7 +1,7 @@
 import { connect_db, get_db } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-export async function allcomments(postId) {
+export async function allcomments(postId , userEmail) {
     await connect_db();
     const db = get_db();  
     
@@ -9,7 +9,16 @@ export async function allcomments(postId) {
         .find({ postId: new ObjectId(postId) })
         .sort({ createdAt: -1 })
         .toArray();
-        // get user info from users collection
+        if (comments.length === 0) {
+          return [];
+        }
+        // get userliked comments from comment liked collection
+        const commentId = comments.map(comment => comment._id);
+        const commentslikes= await db.collection('comment_likes')
+        .find({ commentId: { $in: commentId } })
+        .toArray();
+        console.log(commentslikes);
+    // get user info from users collection
     const userIds = comments.map(comment => comment.userId);
     const users = await db.collection('users')
         .find({ _id: { $in: userIds } })
@@ -22,12 +31,21 @@ export async function allcomments(postId) {
             avatar: user.image || user.email.charAt(0).toUpperCase() // ✅ Use first letter of email as fallback
         });
     });
+    // get list of comment ids liked by user
+    const likesMap = new Map();
+     commentslikes.forEach(like => {
+    const id = like.commentId.toString();
+    if (!likesMap.has(id)) likesMap.set(id, []);
+    likesMap.get(id).push(like.email);
+  });
     // attach user info to comments
     comments.forEach(comment => {
         const user = userMap.get(comment.userId.toString());
         comment.user = user;
+        comment.userLiked = likesMap.get(comment._id.toString())?.includes(userEmail) || false;
+
     });
-    
+
     return comments;
 };
 export async function newcomment(data) {
