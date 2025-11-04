@@ -3,8 +3,7 @@ import { ObjectId } from 'mongodb';
 
 export async function allcomments(postId , userEmail) {
     await connect_db();
-    const db = get_db();  
-    
+    const db = get_db();   
     const comments = await db.collection('comments')
         .find({ postId: new ObjectId(postId) })
         .sort({ createdAt: -1 })
@@ -17,7 +16,6 @@ export async function allcomments(postId , userEmail) {
         const commentslikes= await db.collection('comment_likes')
         .find({ commentId: { $in: commentId } })
         .toArray();
-        console.log(commentslikes);
     // get user info from users collection
     const userIds = comments.map(comment => comment.userId);
     const users = await db.collection('users')
@@ -121,4 +119,47 @@ export async function  likecomment(commentId , liked , email){
   } catch (error) {
     console.error("Error updating like:", error);
   }
+}
+export async function replycomment(data) {
+    await connect_db();
+    const db = get_db();
+    try {
+        const { content, commentId, email , postId} = data;
+        // get user
+        const user = await db.collection('users').findOne({ email });
+        if (!user) {
+            return  'User not found';
+        }
+        const userId = user._id;
+        // create reply comment document
+        const replyCommentDoc = {
+            postId: new ObjectId(postId),
+            parentCommentId: new ObjectId(commentId),
+            content,
+            userId,
+            likes: 0,
+            createdAt: new Date()
+        };
+        const result = await db.collection('comments').insertOne(replyCommentDoc);
+        await db.collection("posts").updateOne({_id : new ObjectId(postId)} , {$inc:{comments: 1}})
+        return{
+          _id: result.insertedId,
+          postId,
+          commentId,
+          content,
+          createdAt: replyCommentDoc.createdAt,
+          likes: 0,
+          userLiked: false,
+          user: {
+            email: user.email,
+            name: user.name || user.email.split('@')[0],
+            avatar: user.image
+          }
+        };
+    }
+
+    catch (error) {
+        console.error("Error adding reply comment:", error);
+        return { error: 'Failed to add reply comment' };
+    } 
 }

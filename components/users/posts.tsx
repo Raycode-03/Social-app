@@ -13,6 +13,7 @@
   import {PostsSkeleton} from "./skeleton";
   import {PostsSkeletonComment} from "./skeleton";
   import { UserAvatar } from "./userAvatar"
+  import { motion, AnimatePresence } from "framer-motion";
   interface mediaItem {
     url : string;
     name: string;
@@ -52,6 +53,18 @@
   createdAt:string;
   likes: number;
   userLiked: boolean; 
+  parentCommentId: string;
+}
+interface Reply {
+  _id: string;
+  postId:string;
+  commentId: string;
+  content: string;
+  email: string;
+  createdAt: string;
+  user: User;
+  likes: number, 
+  userLiked: boolean,
 }
 interface NavbarProps {
     user?: {
@@ -75,6 +88,10 @@ interface NavbarProps {
     const [commentText , setCommentText] = useState("");
     const [commentLikes , setCommentLikes] = useState<Record<string, boolean>>({});
     const [commentLikeCounts, setCommentLikeCounts] = useState<Record<string, number>>({});
+    const [expandedReply, setExpandedReply] = useState<Record<string , boolean>>({});
+    const [replyText, setReplyText] = useState<Record<string, string>>({});
+    const [sendingReply, setSendingReply] = useState<Record<string , boolean>>({});
+    const [replies , setReplies] = useState<Record <string , Reply[]>>({});
     const [copied, setCopied] = useState(false);
     const [feeds, setFeeds] = useState<FeedPost[]>([]);
     const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -218,7 +235,7 @@ interface NavbarProps {
     const res = await fetch(`${baseUrl}/api/feeds/comments`, {
       method: "POST",
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ postId }),     
+      body: JSON.stringify({ postId , email }),     
     });
     const data = await res.json();
     
@@ -351,7 +368,7 @@ useEffect(() => {
       setPostStates(initialPostStates);
     }
   }, [data]);
-  const  handlelikepercomment = (commentId : string) => async () => {
+  const  handlelikepercomment = async (commentId : string) => {
     const currentlyLiked = commentLikes[commentId];
     const newLiked = !currentlyLiked;
     // Step 1: Optimistic update
@@ -386,6 +403,85 @@ useEffect(() => {
   }
       // Here you can also send the like status to the server if needed
   }
+  const handleReplyPerComment = async(commentId: string  , postId : string) => {
+  const text = replyText[commentId]?.trim();
+  if (!text) {
+    toast.error("Reply cannot be empty");
+    return;
+  }
+
+  setSendingReply(prev => ({ ...prev, [commentId]: true }));
+
+  // Create a temporary reply for optimistic UI
+  const tempId = "temp-reply-" + Date.now();
+  const newReply = {
+    _id: tempId,
+    postId,
+    commentId: commentId,
+    likes:0,
+    userLiked:false,
+    content: replyText[commentId],
+    email, // current user's email
+    createdAt: new Date().toISOString(),
+    user: {
+      email,
+      name: email.split("@")[0],
+      avatar: "",
+    },
+  };
+
+  // Optimistically add reply to that comment in UI
+  setReplies(prev => ({
+    ...prev,
+    [commentId]: [newReply, ...(prev[commentId] || [])],
+  }));
+
+  // Clear input
+  setReplyText(prev => ({ ...prev, [commentId]: "" }));
+
+  try {
+    const res = await fetch(`/api/feeds/newreply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        commentId,
+        content: text,
+        email,
+        postId,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(data.error || "Failed to send reply");
+      // remove temp reply
+      setReplies(prev => ({
+        ...prev,
+        [commentId]: prev[commentId].filter(r => r._id !== tempId),
+      }));
+      return;
+    }
+
+    // Replace temp with real reply
+    setReplies(prev => ({
+      ...prev,
+      [commentId]: prev[commentId].map(r => (r._id === tempId ? data : r)),
+    }));
+    toast.success("Reply posted!");
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to send reply");
+    // remove temp reply
+    setReplies(prev => ({
+      ...prev,
+      [commentId]: prev[commentId].filter(r => r._id !== tempId),
+    }));
+  } finally {
+    setSendingReply(prev => ({ ...prev, [commentId]: false }));
+    setExpandedReply(prev => ({ ...prev, [commentId]: false }));
+  }
+};
+
     // socket for real-time updates
   // useEffect(() => {
   //   socket.on("postLiked", (data) => {
@@ -789,12 +885,20 @@ useEffect(() => {
                 </div>
                 </div>
               </CardContent>
-              {commentSection[post._id] && (
+              <AnimatePresence>
+                  {commentSection[post._id] && (
               <CardFooter className="flex flex-col gap-3 border-t border-gray-200 p-4">
+                <motion.div
+                  key="comment-box"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                   className="overflow-hidden mt-2">
                   <div className="send flex flex-row items-center gap-2 w-full">
                     {/* Comment input */}
                   <textarea
-          className="w-full h-10 border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
+          className="w-full h-10 border rounded-lg p-2 text-sm focus:outline-none resize-none overflow-hidden"
           placeholder="Write a comment..."
           maxLength={600}
           value={commentText}
@@ -813,43 +917,210 @@ useEffect(() => {
                 <Image src="/video/spinAnimation.gif" alt="spin Animation" width={22} height={22} className="relative m-auto"/>
               </div>
             ):(<div></div>)}
-      {loadingComments[post._id] ? (
-        <div className="text-center py-4"><PostsSkeletonComment count={4}/></div>
-      ) : commentData[post._id]?.length > 0 ? (
-        commentData[post._id].map((comment) => (
-          
-          <div key={comment._id}>
-            <div className="flex items-start gap-3 max-[450px]:gap-2">
-              <UserAvatar 
-                avatar={comment?.user?.avatar || "https://img.icons8.com/ios-filled/50/user-male-circle.png"}
-                email={comment?.user?.email|| ""}
-                size={36}
-                className="border border-gray-300  w-9 h-9 max-[450px]:w-8 max-[450px]:h-8 max-[380px]:w-6 max-[380px]:h-6"
-              />
-              <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2 max-[450px]:px-2 max-[450px]:py-1.5 max-[380px]:w-full">
-                <span className="font-semibold text-sm text-gray-900 flex gap-2 max-[450px]:text-[13px] max-[380px]:text-[11px] max-[350px]:text-[8px]">
-                  { comment.user.email[0].toUpperCase() + comment.user.email.slice(1)}
-                  <span className="font-normal text-sm text-gray-500 max-[450px]:text-[10px] max-[380px]:text-[8px] max-[350px]:text-[7px]">{formatDistanceToNow( new Date(comment.createdAt) )} ago</span>
+                     {loadingComments[post._id] ? (
+  <div className="text-center py-4">
+    <PostsSkeletonComment count={4} />
+  </div>
+) : commentData[post._id]?.length > 0 ? (
+  (() => {
+    // 1️⃣ Group replies by parent
+    const repliesByParent: Record<string, any[]> = {};
+    (commentData[post._id] || []).forEach(comment => {
+      if (comment.parentCommentId) {
+        if (!repliesByParent[comment.parentCommentId]) {
+          repliesByParent[comment.parentCommentId] = [];
+        }
+        repliesByParent[comment.parentCommentId].push(comment);
+      }
+    });
+
+    // 2️⃣ Render only top-level comments
+    return (commentData[post._id] || [])
+      .filter(comment => !comment.parentCommentId)
+      .map(comment => (
+        <div key={comment._id}>
+          <div className="flex items-start gap-3 max-[450px]:gap-2">
+            <UserAvatar
+              avatar={comment?.user?.avatar || "https://img.icons8.com/ios-filled/50/user-male-circle.png"}
+              email={comment?.user?.email || ""}
+              size={36}
+              className="border border-gray-300 w-9 h-9 max-[450px]:w-8 max-[450px]:h-8 max-[380px]:w-6 max-[380px]:h-6"
+            />
+            <div className="flex-1 bg-gray-100 rounded-lg px-3 py-2 max-[450px]:px-2 max-[450px]:py-1.5 max-[380px]:w-full">
+              <span className="font-semibold text-sm text-gray-900 flex gap-2 max-[450px]:text-[13px] max-[380px]:text-[11px] max-[350px]:text-[8px]">
+                {comment.user.email[0].toUpperCase() + comment.user.email.slice(1)}
+                <span className="font-normal text-sm text-gray-500 max-[450px]:text-[10px] max-[380px]:text-[8px] max-[350px]:text-[7px]">
+                  {formatDistanceToNow(new Date(comment.createdAt))} ago
                 </span>
-                <p className="text-gray-800 text-sm mt-0.5 max-[380px]:text-[12px] break-words max-[350px]:text-[9px]">{comment.content}</p>
-                <div className="flex gap-4 mt-1 text-xs text-gray-500 max-[450px]:gap-3 max-[450px]:text-[11px] max-[380px]:text-[9px]">
-                  <button className={`hover:text-blue-600 ${commentLikes[comment._id] ? 'text-blue-600' : ''} flex`} onClick={handlelikepercomment(comment._id)}disabled={sendingComments}>
-                  <Heart className={`w-4 h-4 mr-1 ${commentLikes[comment._id]} ? 'block text-blue-600': 'hidden' `} fill={commentLikes[comment._id] ? "currentColor" : "none"} />
-                  {/* make work on this  */}
-                    {commentLikes[comment._id] ? `${commentLikeCounts[comment._id] ?? comment.likes} ${commentLikeCounts[comment._id] === 1 ? 'Like' : 'Likes'}`:''}</button>
-                  <button className="hover:text-blue-600">Reply</button>
-                </div>
+              </span>
+              <p className="text-gray-800 text-sm mt-0.5 max-[380px]:text-[12px] break-words max-[350px]:text-[9px]">
+                {comment.content}
+              </p>
+
+              {/* Like + Reply buttons */}
+              <div className="flex gap-4 mt-1 text-xs text-gray-500 max-[450px]:gap-3 max-[450px]:text-[11px] max-[380px]:text-[9px]">
+                <button
+                  className={`hover:text-blue-600 ${commentLikes[comment._id] ? "text-blue-600" : ""} flex`}
+                  onClick={() => handlelikepercomment(comment._id)}
+                  disabled={sendingComments}
+                >
+                  <Heart
+                    className="w-4 h-4 mr-1"
+                    fill={commentLikes[comment._id] ? "currentColor" : "none"}
+                  />
+                  {commentLikeCounts[comment._id] ?? comment.likes}{" "}
+                  {commentLikeCounts[comment._id] === 1 ? "Like" : "Likes"}
+                </button>
+
+                <button
+                  className="hover:text-blue-600 text-sm"
+                  onClick={() =>
+                    setExpandedReply(prev => ({
+                      ...prev,
+                      [comment._id]: !prev[comment._id],
+                    }))
+                  }
+                >
+                  {expandedReply[comment._id] ? "Cancel" : "Reply"}
+                </button>
               </div>
+
+              {/* Reply Box (Animated) */}
+              <AnimatePresence>
+                {expandedReply[comment._id] && (
+                  <motion.div
+                    key="reply-box"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden mt-2"
+                  >
+                    <div className="flex items-center gap-4 mt-1">
+                      <textarea
+                        className="w-full border rounded-lg p-2 text-sm focus:outline-none resize-none h-10"
+                        placeholder="Write a reply..."
+                        maxLength={600}
+                        value={replyText[comment._id] || ""}
+                        onChange={e =>
+                          setReplyText(prev => ({
+                            ...prev,
+                            [comment._id]: e.target.value,
+                          }))
+                        }
+                      />
+                      <button
+                        className={`px-3 py-1.5 rounded-lg text-sm text-white bg-blue-600 hover:bg-blue-700 ${sendingReply[comment._id]   ? "opacity-50 cursor-not-allowed": ""}`}
+                        disabled={sendingReply[comment._id]}
+                        onClick={() =>handleReplyPerComment(comment._id, post._id)} >
+                        Send
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          
           </div>
-        ))
-      ) : (
-        <div className="text-center py-4 text-gray-500">No comments yet</div>
-      )}
+
+          {/* ---------- REPLIES ---------- */}
+          {repliesByParent[comment._id]?.length > 0 && (
+            <div className="ml-10 mt-2 space-y-2 border-l border-gray-200 pl-4">
+              {repliesByParent[comment._id].map(reply => (
+                <div key={reply._id} className="flex items-start gap-3">
+                  <UserAvatar
+                    avatar={
+                      reply?.user?.avatar ||
+                      "https://img.icons8.com/ios-filled/50/user-male-circle.png"
+                    }
+                    email={reply?.user?.email || ""}
+                    size={36}
+                    className="border border-gray-300 w-9 h-9"
+                  />
+                  <div className="flex-1 bg-gray-50 rounded-lg px-3 py-2">
+                    <span className="font-semibold text-sm text-gray-900 flex gap-2">
+                      {reply.user.email[0].toUpperCase() +
+                        reply.user.email.slice(1)}
+                      <span className="font-normal text-gray-500 text-xs">
+                        {formatDistanceToNow(new Date(reply.createdAt))} ago
+                      </span>
+                    </span>
+                    <p className="text-gray-800 text-sm mt-0.5 break-words">
+                      {reply.content}
+                    </p>
+
+                    <div className="flex gap-4 mt-1 text-xs text-gray-500">
+                      <button
+                        className={`hover:text-blue-600 ${  commentLikes[reply._id] ? "text-blue-600" : ""           } flex`}onClick={() => handlelikepercomment(reply._id)}
+                        disabled={sendingComments}>
+                        <Heart
+                          className="w-4 h-4 mr-1"
+                          fill={   commentLikes[reply._id] ? "currentColor" : "none"      }   />
+                        {commentLikeCounts[reply._id] ?? reply.likes}{" "}
+                        {commentLikeCounts[reply._id] === 1 ? "Like" : "Likes"}
+                      </button>
+
+                      <button
+                        className="hover:text-blue-600 text-sm"
+                        onClick={() =>
+                          setExpandedReply(prev => ({
+                            ...prev,
+                            [reply._id]: !prev[reply._id],
+                          }))
+                        }
+                      >
+                        {expandedReply[reply._id] ? "Cancel" : "Reply"}
+                      </button>
+                    </div>
+
+                    <AnimatePresence>
+                      {expandedReply[reply._id] && (
+                        <motion.div
+                          key="reply-box"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3, ease: "easeInOut" }}
+                          className="overflow-hidden mt-2"
+                        >
+                          <div className="flex items-center gap-4 mt-1">
+                            <textarea
+                              className="w-full border rounded-lg p-2 text-sm focus:outline-none resize-none h-10"
+                              placeholder="Write a reply..."
+                              maxLength={600}
+                              value={replyText[reply._id] || ""}
+                              onChange={e =>
+                                setReplyText(prev => ({
+                                  ...prev,
+                                  [reply._id]: e.target.value,
+                                }))
+                              }
+                            />
+                            <button
+                              className={`px-3 py-1.5 rounded-lg text-sm text-white bg-blue-600 hover:bg-blue-700 ${sendingReply[reply._id] ? "opacity-50 cursor-not-allowed" : ""  }`} disabled={sendingReply[reply._id]} onClick={() => handleReplyPerComment(reply._id, post._id)}>
+                              Send
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ));
+  })()
+) : (
+  <div className="text-center py-4 text-gray-500">No comments yet</div>
+)}
+
     </div>
+              </motion.div>
               </CardFooter>
             )}
+              </AnimatePresence>
+              
             </Card>
                 );
               })}
