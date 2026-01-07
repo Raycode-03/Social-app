@@ -1,4 +1,46 @@
 Made by Raycode-03 😎
+
+---
+
+# 2️⃣ Feeds App (LinkedIn-like) — README.md
+
+**Important:** This README clearly says it’s **incomplete**. That is GOOD, not bad.
+
+```md
+# Feeds Platform (Social App)
+
+A social feed application inspired by LinkedIn, focused on content sharing and engagement.
+
+## Features
+- User authentication (JWT & Google OAuth)
+- Create posts with:
+  - Text formatting (bold, italic, lists, paragraphs)
+  - Up to 3 images
+  - 1 video or file per post
+- Edit posts
+- Like, comment, and share posts
+- Feed prioritization:
+  - User posts
+  - Friends’ posts
+  - Posts liked or commented on by friends
+- Pagination & skeleton loaders
+- Persistent like state per user
+
+## Tech Stack
+- Frontend: Next.js, TypeScript, Tailwind CSS
+- Backend: Node.js, Express.js
+- Database: MongoDB
+- Authentication: JWT, OAuth
+- Media Storage: Cloudinary
+
+## Limitations
+- Real-time chat system not implemented
+- Messaging feature was planned but not completed
+
+## Status
+Work in progress  
+Stopped at feeds and core social features
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
